@@ -1,7 +1,3 @@
-local _args = ...
-local _isPaidUser = type(_args) == 'table' and _args.Username and _args.Password
-getgenv().AeroLocalPaid = _isPaidUser and true or false
-
 local isfile = isfile or function(file)
 	local suc, res = pcall(function()
 		return readfile(file)
@@ -16,13 +12,7 @@ end
 local function downloadFile(path, func)
 	if not isfile(path) then
 		local suc, res = pcall(function()
-			return game:HttpGet(
-				'https://raw.githubusercontent.com/agharandarham2-debug/poopontheparty/'
-				.. readfile('newvape/profiles/commit.txt')
-				.. '/'
-				.. select(1, path:gsub('newvape/', '')),
-				true
-			)
+			return game:HttpGet('https://raw.githubusercontent.com/agharandarham2-debug/poopontheparty/'..readfile('newvape/profiles/commit.txt')..'/'..select(1, path:gsub('newvape/', '')), true)
 		end)
 
 		if not suc or res == '404: Not Found' then
@@ -30,7 +20,7 @@ local function downloadFile(path, func)
 		end
 
 		if path:find('.lua') then
-			res = '--This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.\n' .. res
+			res = '--This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.\n'..res
 		end
 
 		writefile(path, res)
@@ -45,8 +35,7 @@ local function wipeFolder(path)
 	for _, file in listfiles(path) do
 		if file:find('loader') then continue end
 
-		if isfile(file)
-			and select(1, readfile(file):find('--This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.')) == 1 then
+		if isfile(file) and select(1, readfile(file):find('--This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.')) == 1 then
 			delfile(file)
 		end
 	end
@@ -81,9 +70,7 @@ local function downloadPremadeProfiles(commit)
 	end
 
 	local success, response = pcall(function()
-		return game:HttpGet(
-			'https://api.github.com/repos/agharandarham2-debug/poopontheparty/contents/profiles/premade?ref=' .. commit
-		)
+		return game:HttpGet('https://api.github.com/repos/agharandarham2-debug/poopontheparty/contents/profiles/premade?ref=' .. commit)
 	end)
 
 	if success and response then
@@ -119,10 +106,7 @@ if not shared.VapeDeveloper then
 	local commit = 'main'
 
 	local ok, res = pcall(function()
-		return game:HttpGet(
-			'https://api.github.com/repos/agharandarham2-debug/poopontheparty/commits/main',
-			true
-		)
+		return game:HttpGet('https://api.github.com/repos/agharandarham2-debug/poopontheparty/commits/main', true)
 	end)
 
 	if ok and res then
@@ -133,11 +117,7 @@ if not shared.VapeDeveloper then
 		end
 	end
 
-	if commit ~= 'main'
-		and (isfile('newvape/profiles/commit.txt')
-		and readfile('newvape/profiles/commit.txt')
-		or '') ~= commit then
-
+	if commit ~= 'main' and (isfile('newvape/profiles/commit.txt') and readfile('newvape/profiles/commit.txt') or '') ~= commit then
 		wipeFolder('newvape')
 		wipeFolder('newvape/games')
 		wipeFolder('newvape/guis')
@@ -165,7 +145,4 @@ if not shared.VapeDeveloper then
 	pcall(downloadPremadeProfiles, commit)
 end
 
-return loadstring(downloadFile('newvape/main.lua'), 'main')({
-	Username = shared.ValidatedUsername,
-	Password = _args and _args.Password or nil
-})
+return loadstring(downloadFile('newvape/main.lua'), 'main')()
