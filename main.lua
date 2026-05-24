@@ -28,50 +28,71 @@ local loadstring = function(...)
 	end
 	return res
 end
+
 local queue_on_teleport = queue_on_teleport or function() end
+
 local isfile = isfile or function(file)
 	local suc, res = pcall(function()
 		return readfile(file)
 	end)
 	return suc and res ~= nil and res ~= ''
 end
+
 local cloneref = cloneref or function(obj)
 	return obj
 end
+
 local playersService = cloneref(game:GetService('Players'))
 local httpService = cloneref(game:GetService('HttpService'))
+
+local REPO = 'agharandarham2-debug/poopontheparty'
 
 local function downloadFile(path, func)
 	if not isfile(path) then
 		local res
 		local success = false
+
 		for attempt = 1, 3 do
 			local suc, result = pcall(function()
-				return game:HttpGet('https://raw.githubusercontent.com/poopparty/poopparty/' .. readfile('newvape/profiles/commit.txt') .. '/' .. select(1, path:gsub('newvape/', '')), true)
+				return game:HttpGet(
+					'https://raw.githubusercontent.com/' ..
+					REPO .. '/' ..
+					readfile('newvape/profiles/commit.txt') .. '/' ..
+					select(1, path:gsub('newvape/', '')),
+					true
+				)
 			end)
+
 			if suc and result ~= '404: Not Found' then
 				res = result
 				success = true
 				break
 			end
+
 			task.wait(1)
 		end
+
 		if not success then
 			error('Failed to download ' .. path .. ' after 3 attempts')
 		end
+
 		if path:find('.lua') then
 			res = '--This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.\n' .. res
 		end
+
 		writefile(path, res)
 	end
+
 	return (func or readfile)(path)
 end
 
 local function migrateProfiles()
-	if isfile('newvape/profiles/migrated_placeid.txt') then return end
+	if isfile('newvape/profiles/migrated_placeid.txt') then
+		return
+	end
 
-    local oldId = tostring(game.GameId)
-    local newId = tostring(game.PlaceId)
+	local oldId = tostring(game.GameId)
+	local newId = tostring(game.PlaceId)
 
 	if oldId == newId then
 		pcall(writefile, 'newvape/profiles/migrated_placeid.txt', 'done')
@@ -79,12 +100,17 @@ local function migrateProfiles()
 	end
 
 	local suffix = oldId .. '.txt'
+
 	for _, path in ipairs(listfiles('newvape/profiles')) do
 		local name = path:gsub('\\', '/')
+
 		if name:sub(-#suffix) == suffix then
 			local newPath = name:sub(1, -#suffix - 1) .. newId .. '.txt'
+
 			if not isfile(newPath) then
-				pcall(function() writefile(newPath, readfile(path)) end)
+				pcall(function()
+					writefile(newPath, readfile(path))
+				end)
 			end
 		end
 	end
@@ -92,10 +118,14 @@ local function migrateProfiles()
 	if isfolder('newvape/profiles/premade') then
 		for _, path in ipairs(listfiles('newvape/profiles/premade')) do
 			local name = path:gsub('\\', '/')
+
 			if name:sub(-#suffix) == suffix then
 				local newPath = name:sub(1, -#suffix - 1) .. newId .. '.txt'
+
 				if not isfile(newPath) then
-					pcall(function() writefile(newPath, readfile(path)) end)
+					pcall(function()
+						writefile(newPath, readfile(path))
+					end)
 				end
 			end
 		end
@@ -108,11 +138,14 @@ pcall(migrateProfiles)
 
 local function finishLoading()
 	vape.Init = nil
+
 	if not vape.Load then
 		warn('[AEROV4] vape.Load is nil skipping load')
 		return
 	end
+
 	vape:Load()
+
 	vape:Clean(task.spawn(function()
 		repeat
 			pcall(vape.Save, vape)
@@ -121,35 +154,57 @@ local function finishLoading()
 	end))
 
 	local teleportedServers
+
 	vape:Clean(playersService.LocalPlayer.OnTeleport:Connect(function()
 		if (not teleportedServers) and (not shared.VapeIndependent) then
 			teleportedServers = true
+
 			local teleportScript = [[
 				repeat task.wait() until game:IsLoaded()
-				if getgenv and not getgenv().shared then getgenv().shared = {} end
+
+				if getgenv and not getgenv().shared then
+					getgenv().shared = {}
+				end
+
 				shared.vapereload = true
-				loadstring(game:HttpGet('https://raw.githubusercontent.com/poopparty/poopparty/'..readfile('newvape/profiles/commit.txt')..'/loader.lua', true), 'loader')()
+
+				loadstring(game:HttpGet(
+					'https://raw.githubusercontent.com/agharandarham2-debug/poopontheparty/' ..
+					readfile('newvape/profiles/commit.txt') ..
+					'/loader.lua',
+					true
+				), 'loader')()
 			]]
+
 			if shared.VapeDeveloper then
 				teleportScript = 'shared.VapeDeveloper = true\n' .. teleportScript
 			end
+
 			if shared.VapeCustomProfile then
 				teleportScript = 'shared.VapeCustomProfile = "' .. shared.VapeCustomProfile .. '"\n' .. teleportScript
 			end
+
 			if shared.ValidatedUsername then
 				teleportScript = 'shared.ValidatedUsername = "' .. shared.ValidatedUsername .. '"\n' .. teleportScript
 			end
-			local _ok, _err = pcall(function() vape:Save() end)
-			if not _ok then warn('[AEROV4] save failed before teleport: ' .. tostring(_err)) end
+
+			local _ok, _err = pcall(function()
+				vape:Save()
+			end)
+
+			if not _ok then
+				warn('[AEROV4] save failed before teleport: ' .. tostring(_err))
+			end
+
 			queue_on_teleport(teleportScript)
 		end
 	end))
 end
 
-
 if not isfile('newvape/profiles/gui.txt') then
 	writefile('newvape/profiles/gui.txt', 'new')
 end
+
 local gui = readfile('newvape/profiles/gui.txt')
 
 if not isfolder('newvape/assets/' .. gui) then
@@ -158,76 +213,88 @@ end
 
 local guiSource = downloadFile('newvape/guis/' .. gui .. '.lua')
 local guiFunc, guiErr = loadstring(guiSource, 'gui')
+
 if not guiFunc then
 	local errMsg = tostring(guiErr)
-	local lineNum = errMsg:match(':(%d+):')
-	local context = ''
-	if lineNum then
-		local n = tonumber(lineNum)
-		local lines = guiSource:split('\n')
-		local from = math.max(1, n - 2)
-		local to   = math.min(#lines, n + 2)
-		local parts = {}
-		for i = from, to do
-			local marker = i == n and '>>> ' or '    '
-			table.insert(parts, marker .. i .. ': ' .. (lines[i] or ''))
-		end
-		context = '\n\nContext:\n' .. table.concat(parts, '\n')
-	end
-	error('[AEROV4] syntax error in ' .. gui .. '.lua' .. '\n' .. errMsg .. context)
+	error('[AEROV4] syntax error in ' .. gui .. '.lua\n' .. errMsg)
 end
+
 vape = guiFunc()
+
 if not vape then
-	error('[AEROV4] GUI returned nil file may be corrupted try deleting newvape/guis/' .. gui .. '.lua and reinjecting.')
+	error('[AEROV4] GUI returned nil')
 end
+
 if not vape.Load then
-	if delfile then pcall(function() delfile('newvape/guis/' .. gui .. '.lua') end) end
-	error('[AEROV4] gui file corrupted (missing load) reinject..')
+	error('[AEROV4] gui file corrupted')
 end
-if not vape.Init and not vape.Load then
-	error('[AEROV4] failed to initialize properly reinject to fix this bs')
-end
+
 shared.vape = vape
+
 task.wait(0.1)
-
-
 
 if getgenv().Closet then
 	local LogService = cloneref(game:GetService('LogService'))
 	local originals = {}
+
 	local function hook(funcName)
 		if typeof(getgenv()[funcName]) == 'function' then
 			local original = hookfunction(getgenv()[funcName], function() end)
 			originals[funcName] = original
 		end
 	end
+
 	hook('print')
 	hook('warn')
 	hook('error')
 	hook('info')
-	pcall(function() LogService:ClearOutput() end)
+
+	pcall(function()
+		LogService:ClearOutput()
+	end)
+
 	local conn = LogService.MessageOut:Connect(function()
 		LogService:ClearOutput()
 	end)
+
 	getgenv()._vape_log_connection = conn
 	getgenv()._vape_originals = originals
 end
 
 if not shared.VapeIndependent then
 	loadstring(downloadFile('newvape/games/universal.lua'), 'universal')()
-	local gameFileId = (game.GameId == 2619619496) and (game.PlaceId == 6872265039 and 6872265039 or 6872274481) or game.PlaceId
+
+	local gameFileId =
+		(game.GameId == 2619619496)
+		and (game.PlaceId == 6872265039 and 6872265039 or 6872274481)
+		or game.PlaceId
+
 	if isfile('newvape/games/' .. gameFileId .. '.lua') then
-		loadstring(downloadFile('newvape/games/' .. gameFileId .. '.lua'), tostring(gameFileId))(...)
+		loadstring(
+			downloadFile('newvape/games/' .. gameFileId .. '.lua'),
+			tostring(gameFileId)
+		)(...)
 	else
 		if not shared.VapeDeveloper then
 			local suc, res = pcall(function()
-				return game:HttpGet('https://raw.githubusercontent.com/poopparty/poopparty/' .. readfile('newvape/profiles/commit.txt') .. '/games/' .. gameFileId .. '.lua', true)
+				return game:HttpGet(
+					'https://raw.githubusercontent.com/' ..
+					REPO .. '/' ..
+					readfile('newvape/profiles/commit.txt') ..
+					'/games/' .. gameFileId .. '.lua',
+					true
+				)
 			end)
+
 			if suc and res ~= '404: Not Found' then
-				loadstring(downloadFile('newvape/games/' .. gameFileId .. '.lua'), tostring(gameFileId))(...)
+				loadstring(
+					downloadFile('newvape/games/' .. gameFileId .. '.lua'),
+					tostring(gameFileId)
+				)(...)
 			end
 		end
 	end
+
 	finishLoading()
 else
 	vape.Init = finishLoading
