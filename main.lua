@@ -144,7 +144,7 @@ local function finishLoading()
 			queue_on_teleport(teleportScript)
 		end
 	end))
-
+end
 
 
 if not isfile('newvape/profiles/gui.txt') then
