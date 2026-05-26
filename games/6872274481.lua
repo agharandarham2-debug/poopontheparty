@@ -54,7 +54,13 @@ local isnetworkowner = identifyexecutor and table.find({'Delta', 'Volt'}, ({iden
 	return true
 end
 local gameCamera = workspace.CurrentCamera
-local lplr = playersService.LocalPlayer
+local lplr = playersService.LocalPlayer or playersService.PlayerAdded:Wait()
+
+local function getPlayerScripts()
+	lplr = playersService.LocalPlayer or playersService.PlayerAdded:Wait()
+	return lplr:WaitForChild("PlayerScripts")
+end
+
 local assetfunction = getcustomasset
 
 local vape = shared.vape
@@ -909,7 +915,7 @@ run(function()
 	local KnitInit, Knit
 	repeat
 		KnitInit, Knit = pcall(function()
-			return debug.getupvalue(require(lplr.PlayerScripts.TS.knit).setup, 9)
+			return debug.getupvalue(require(getPlayerScripts().TS.knit).setup, 9)
 		end)
 		if KnitInit then break end
 		task.wait()
@@ -932,7 +938,7 @@ run(function()
 	bedwars = setmetatable({
 		RankMeta = require(replicatedStorage.TS.rank['rank-meta']).RankMeta,
         BalanceFile = require(replicatedStorage.TS.balance["balance-file"]).BalanceFile,
-        ClientSyncEvents = require(lplr.PlayerScripts.TS['client-sync-events']).ClientSyncEvents,
+        ClientSyncEvents = require(getPlayerScripts().TS['client-sync-events']).ClientSyncEvents,
         SyncEventPriority = require(replicatedStorage.rbxts_include.node_modules['@easy-games']['sync-event'].out),
 		AbilityId = require(replicatedStorage.TS.ability['ability-id']).AbilityId,
         IdUtil = require(replicatedStorage.TS.util['id-util']).IdUtil,
@@ -942,7 +948,7 @@ run(function()
 		KitController = Knit.Controllers.KitController,
 		FishermanUtil = require(replicatedStorage.TS.games.bedwars.kit.kits.fisherman['fisherman-util']).FishermanUtil,
 		FishMeta = require(replicatedStorage.TS.games.bedwars.kit.kits.fisherman['fish-meta']),
-	 	MatchHistroyApp = require(lplr.PlayerScripts.TS.controllers.global["match-history"].ui["match-history-moderation-app"]).MatchHistoryModerationApp,
+	 	MatchHistroyApp = require(getPlayerScripts().TS.controllers.global["match-history"].ui["match-history-moderation-app"]).MatchHistoryModerationApp,
 	 	MatchHistroyController = Knit.Controllers.MatchHistoryController,
 		BlockEngine = require(game:GetService("ReplicatedStorage").rbxts_include.node_modules["@easy-games"]["block-engine"].out).BlockEngine,
 		BlockSelectorMode = require(game:GetService("ReplicatedStorage").rbxts_include.node_modules["@easy-games"]["block-engine"].out.client.select["block-selector"]).BlockSelectorMode,
@@ -950,7 +956,7 @@ run(function()
 		GamePlayer = require(replicatedStorage.TS.player['game-player']),
 		OfflinePlayerUtil = require(replicatedStorage.TS.player['offline-player-util']),
 		PlayerUtil = require(replicatedStorage.TS.player['player-util']),
-		KKKnitController = require(lplr.PlayerScripts.TS.lib.knit['knit-controller']),
+		KKKnitController = require(getPlayerScripts().TS.lib.knit['knit-controller']),
 		AbilityController = Flamework.resolveDependency('@easy-games/game-core:client/controllers/ability/ability-controller@AbilityController'),
 		CooldownController = Flamework.resolveDependency("@easy-games/game-core:client/controllers/cooldown/cooldown-controller@CooldownController"),
 		CooldownIDS = require(replicatedStorage.TS.cooldown["cooldown-id"]).CooldownId,		
@@ -961,7 +967,7 @@ run(function()
 		BedwarsKitMeta = require(replicatedStorage.TS.games.bedwars.kit['bedwars-kit-meta']).BedwarsKitMeta,
 		BlockBreaker = Knit.Controllers.BlockBreakController.blockBreaker,
 		BlockController = require(replicatedStorage['rbxts_include']['node_modules']['@easy-games']['block-engine'].out).BlockEngine,
-		BlockEngine = require(lplr.PlayerScripts.TS.lib['block-engine']['client-block-engine']).ClientBlockEngine,
+		BlockEngine = require(getPlayerScripts().TS.lib['block-engine']['client-block-engine']).ClientBlockEngine,
 		BlockPlacer = require(replicatedStorage['rbxts_include']['node_modules']['@easy-games']['block-engine'].out.client.placement['block-placer']).BlockPlacer,
 		BowConstantsTable = (Knit.Controllers.ProjectileController and Knit.Controllers.ProjectileController.enableBeam) and debug.getupvalue(Knit.Controllers.ProjectileController.enableBeam, 8) or {},
 		ClickHold = require(replicatedStorage['rbxts_include']['node_modules']['@easy-games']['game-core'].out.client.ui.lib.util['click-hold']).ClickHold,
@@ -971,7 +977,7 @@ run(function()
 		CombatConstant = require(replicatedStorage.TS.combat['combat-constant']).CombatConstant,
 		SharedConstants = require(replicatedStorage.TS['shared-constants']),
 		DamageIndicator = Knit.Controllers.DamageIndicatorController.spawnDamageIndicator,
-		DefaultKillEffect = require(lplr.PlayerScripts.TS.controllers.global.locker['kill-effect'].effects['default-kill-effect']),
+		DefaultKillEffect = require(getPlayerScripts().TS.controllers.global.locker['kill-effect'].effects['default-kill-effect']),
 		EmoteType = require(replicatedStorage.TS.locker.emote['emote-type']).EmoteType,
 		GameAnimationUtil = require(replicatedStorage.TS.animation['animation-util']).GameAnimationUtil,
 		NotificationController = Flamework.resolveDependency('@easy-games/game-core:client/controllers/notification-controller@NotificationController'),
@@ -988,9 +994,9 @@ run(function()
 				armor = {}
 			}
 		end,
-		MatchHistoryController = require(lplr.PlayerScripts.TS.controllers.global['match-history']['match-history-controller']),
-		PlayerProfileUIController = require(lplr.PlayerScripts.TS.controllers.global['player-profile']['player-profile-ui-controller']),
-		HudAliveCount = require(lplr.PlayerScripts.TS.controllers.global['top-bar'].ui.game['hud-alive-player-counts']).HudAlivePlayerCounts,
+		MatchHistoryController = require(getPlayerScripts().TS.controllers.global['match-history']['match-history-controller']),
+		PlayerProfileUIController = require(getPlayerScripts().TS.controllers.global['player-profile']['player-profile-ui-controller']),
+		HudAliveCount = require(getPlayerScripts().TS.controllers.global['top-bar'].ui.game['hud-alive-player-counts']).HudAlivePlayerCounts,
 		ItemMeta = (function()
 			local fn = require(replicatedStorage.TS.item['item-meta']).getItemMeta
 			for i = 1, 6 do
@@ -1008,19 +1014,19 @@ run(function()
 		PartyController = Flamework.resolveDependency("@easy-games/lobby:client/controllers/party-controller@PartyController"),
 		ProjectileMeta = require(replicatedStorage.TS.projectile['projectile-meta']).ProjectileMeta,
 		QueryUtil = require(replicatedStorage['rbxts_include']['node_modules']['@easy-games']['game-core'].out).GameQueryUtil,
-		QueueCard = require(lplr.PlayerScripts.TS.controllers.global.queue.ui['queue-card']).QueueCard,
+		QueueCard = require(getPlayerScripts().TS.controllers.global.queue.ui['queue-card']).QueueCard,
 		QueueMeta = require(replicatedStorage.TS.game['queue-meta']).QueueMeta,
 		Roact = require(replicatedStorage['rbxts_include']['node_modules']['@rbxts']['roact'].src),
 		RuntimeLib = require(replicatedStorage['rbxts_include'].RuntimeLib),
 		SoundList = require(replicatedStorage.TS.sound['game-sound']).GameSound,
 		SoundManager = require(replicatedStorage['rbxts_include']['node_modules']['@easy-games']['game-core'].out.shared.sound['sound-manager']).SoundManager,
-		Store = require(lplr.PlayerScripts.TS.ui.store).ClientStore,
+		Store = require(getPlayerScripts().TS.ui.store).ClientStore,
 		TeamUpgradeMeta = debug.getupvalue(require(replicatedStorage.TS.games.bedwars['team-upgrade']['team-upgrade-meta']).getTeamUpgradeMetaForQueue, 6),
 		UILayers = require(replicatedStorage['rbxts_include']['node_modules']['@easy-games']['game-core'].out).UILayers,
-		VisualizerUtils = require(lplr.PlayerScripts.TS.lib.visualizer['visualizer-utils']).VisualizerUtils,
+		VisualizerUtils = require(getPlayerScripts().TS.lib.visualizer['visualizer-utils']).VisualizerUtils,
 		WeldTable = require(replicatedStorage.TS.util['weld-util']).WeldUtil,
 		WinEffectMeta = require(replicatedStorage.TS.locker['win-effect']['win-effect-meta']).WinEffectMeta,
-		ZapNetworking = require(lplr.PlayerScripts.TS.lib.network),
+		ZapNetworking = require(getPlayerScripts().TS.lib.network),
 	}, {
 		__index = function(self, ind)
 			rawset(self, ind, Knit.Controllers[ind])
@@ -1054,7 +1060,7 @@ run(function()
 		MinerDig = safeGetProto(Knit.Controllers.MinerController.setupMinerPrompts, 1),
 		PickupItem = Knit.Controllers.ItemDropController.checkForPickup,
 		PickupMetal = safeGetProto(Knit.Controllers.HiddenMetalController.onKitLocalActivated, 4),
-		ReportPlayer = require(lplr.PlayerScripts.TS.controllers.global.report['report-controller']).default.reportPlayer,
+		ReportPlayer = require(getPlayerScripts().TS.controllers.global.report['report-controller']).default.reportPlayer,
 		ResetCharacter = safeGetProto(Knit.Controllers.ResetController.createBindable, 1),
 		SummonerClawAttack = Knit.Controllers.SummonerClawHandController.attack,
 		WarlockTarget = safeGetProto(Knit.Controllers.WarlockStaffController.KnitStart, 2)
@@ -12461,7 +12467,7 @@ run(function()
                     local backup = {}; function backup:setQueryIgnored() end; l__GameQueryUtil__8 = backup;
                 end
                 local l__TweenService__9 = tweenService
-                local player = playersService.LocalPlayer
+                local player = playersService.LocalPlayer or playersService.PlayerAdded:Wait()
                 local character = player.Character
                 
                 if not character then 
@@ -16469,9 +16475,9 @@ end)
 
 run(function()
 	local Interface
-	local HotbarOpenInventory = require(lplr.PlayerScripts.TS.controllers.global.hotbar.ui['hotbar-open-inventory']).HotbarOpenInventory
-	local HotbarHealthbar = require(lplr.PlayerScripts.TS.controllers.global.hotbar.ui.healthbar['hotbar-healthbar']).HotbarHealthbar
-	local HotbarApp = getRoactRender(require(lplr.PlayerScripts.TS.controllers.global.hotbar.ui['hotbar-app']).HotbarApp.render)
+	local HotbarOpenInventory = require(getPlayerScripts().TS.controllers.global.hotbar.ui['hotbar-open-inventory']).HotbarOpenInventory
+	local HotbarHealthbar = require(getPlayerScripts().TS.controllers.global.hotbar.ui.healthbar['hotbar-healthbar']).HotbarHealthbar
+	local HotbarApp = getRoactRender(require(getPlayerScripts().TS.controllers.global.hotbar.ui['hotbar-app']).HotbarApp.render)
 	local old, new = {}, {}
 	
 	vape:Clean(function()
@@ -26480,7 +26486,7 @@ run(function()
 	local KnitInit, Knit
 	repeat
 		KnitInit, Knit = pcall(function()
-			return debug.getupvalue(require(lplr.PlayerScripts.TS.knit).setup, 9)
+			return debug.getupvalue(require(getPlayerScripts().TS.knit).setup, 9)
 		end)
 		if KnitInit then break end
 		task.wait()
@@ -31605,9 +31611,9 @@ run(function()
 				if viewmodel then
 					gameCamera.Viewmodel.RightHand.RightWrist.C1 = oldc1 * CFrame.Angles(math.rad(Rots[1].Value), math.rad(Rots[2].Value), math.rad(Rots[3].Value))
 				end
-				lplr.PlayerScripts.TS.controllers.global.viewmodel['viewmodel-controller']:SetAttribute('ConstantManager_DEPTH_OFFSET', -Depth.Value)
-				lplr.PlayerScripts.TS.controllers.global.viewmodel['viewmodel-controller']:SetAttribute('ConstantManager_HORIZONTAL_OFFSET', Horizontal.Value)
-				lplr.PlayerScripts.TS.controllers.global.viewmodel['viewmodel-controller']:SetAttribute('ConstantManager_VERTICAL_OFFSET', Vertical.Value)
+				getPlayerScripts().TS.controllers.global.viewmodel['viewmodel-controller']:SetAttribute('ConstantManager_DEPTH_OFFSET', -Depth.Value)
+				getPlayerScripts().TS.controllers.global.viewmodel['viewmodel-controller']:SetAttribute('ConstantManager_HORIZONTAL_OFFSET', Horizontal.Value)
+				getPlayerScripts().TS.controllers.global.viewmodel['viewmodel-controller']:SetAttribute('ConstantManager_VERTICAL_OFFSET', Vertical.Value)
 			else
 				bedwars.ViewmodelController.playAnimation = old
 				if viewmodel then
@@ -31615,9 +31621,9 @@ run(function()
 				end
 	
 				bedwars.InventoryViewmodelController:handleStore(bedwars.Store:getState())
-				lplr.PlayerScripts.TS.controllers.global.viewmodel['viewmodel-controller']:SetAttribute('ConstantManager_DEPTH_OFFSET', 0)
-				lplr.PlayerScripts.TS.controllers.global.viewmodel['viewmodel-controller']:SetAttribute('ConstantManager_HORIZONTAL_OFFSET', 0)
-				lplr.PlayerScripts.TS.controllers.global.viewmodel['viewmodel-controller']:SetAttribute('ConstantManager_VERTICAL_OFFSET', 0)
+				getPlayerScripts().TS.controllers.global.viewmodel['viewmodel-controller']:SetAttribute('ConstantManager_DEPTH_OFFSET', 0)
+				getPlayerScripts().TS.controllers.global.viewmodel['viewmodel-controller']:SetAttribute('ConstantManager_HORIZONTAL_OFFSET', 0)
+				getPlayerScripts().TS.controllers.global.viewmodel['viewmodel-controller']:SetAttribute('ConstantManager_VERTICAL_OFFSET', 0)
 				old = nil
 			end
 		end,
@@ -31631,7 +31637,7 @@ run(function()
 		Decimal = 10,
 		Function = function(val)
 			if Viewmodel.Enabled then
-				lplr.PlayerScripts.TS.controllers.global.viewmodel['viewmodel-controller']:SetAttribute('ConstantManager_DEPTH_OFFSET', -val)
+				getPlayerScripts().TS.controllers.global.viewmodel['viewmodel-controller']:SetAttribute('ConstantManager_DEPTH_OFFSET', -val)
 			end
 		end
 	})
@@ -31643,7 +31649,7 @@ run(function()
 		Decimal = 10,
 		Function = function(val)
 			if Viewmodel.Enabled then
-				lplr.PlayerScripts.TS.controllers.global.viewmodel['viewmodel-controller']:SetAttribute('ConstantManager_HORIZONTAL_OFFSET', val)
+				getPlayerScripts().TS.controllers.global.viewmodel['viewmodel-controller']:SetAttribute('ConstantManager_HORIZONTAL_OFFSET', val)
 			end
 		end
 	})
@@ -31655,7 +31661,7 @@ run(function()
 		Decimal = 10,
 		Function = function(val)
 			if Viewmodel.Enabled then
-				lplr.PlayerScripts.TS.controllers.global.viewmodel['viewmodel-controller']:SetAttribute('ConstantManager_VERTICAL_OFFSET', val)
+				getPlayerScripts().TS.controllers.global.viewmodel['viewmodel-controller']:SetAttribute('ConstantManager_VERTICAL_OFFSET', val)
 			end
 		end
 	})
