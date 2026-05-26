@@ -30311,7 +30311,7 @@ run(function()
 	
 	local blockColors = {
 		["clay_white"] = Color3.fromRGB(255, 255, 255),
-		["wool_white"] = Color3.fromRGB(255, 255, 255),
+		["wool_white"] = Color3.fromRGB(0, 0, 0),
 		["wool_red"] = Color3.fromRGB(255, 50, 50),
 		["wool_green"] = Color3.fromRGB(50, 255, 50),
 		["grass"] = Color3.fromRGB(50, 255, 50),
