@@ -858,18 +858,20 @@ run(function()
 			table.insert(tab, vkSignal)
 		end
 
-		local blockKickerSignal = {
-			Connect = function(_, func)
-				local conn = char.AttributeChanged:Connect(function(attr)
-					if attr == 'BlockKickerKit_BlockCount' then
-						lastUpdate[ent] = 0
-						func()
-					end
-				end)
-				return conn
+local blockKickerSignal = {
+	Connect = function(_, func)
+		local conn = char.AttributeChanged:Connect(function(attr)
+			if attr == 'BlockKickerKit_BlockCount' then
+				if ent and lastUpdate then
+					lastUpdate[ent] = 0
+				end
+				func()
 			end
-		}
-		table.insert(tab, blockKickerSignal)
+		end)
+		return conn
+	end
+}
+table.insert(tab, blockKickerSignal)
 
 		local shieldSignal = {
 			Connect = function(_, func)
