@@ -12,7 +12,7 @@ local runService = cloneref(game:GetService('RunService'))
 local tweenService = cloneref(game:GetService('TweenService'))
 
 local gameCamera = workspace.CurrentCamera
-local lplr = playersService.LocalPlayer
+local lplr = playersService.LocalPlayer or playersService.PlayerAdded:Wait()
 
 local vape = shared.vape
 local entitylib = vape.Libraries.entity
@@ -23,7 +23,8 @@ local uipallet = vape.Libraries.uipallet
 local getcustomasset = vape.Libraries.getcustomasset
 
 local clientData = require(replicatedStorage.modules.player.ClientData)
-local aiController = require(lplr.PlayerScripts.AIController)
+local playerScripts = lplr:WaitForChild("PlayerScripts")
+local aiController = require(playerScripts:WaitForChild("AIController"))
 local projectiles = require(replicatedStorage.modules.game.Projectiles).Projectile
 local itemData = {}
 for _, v in debug.getupvalue(require(replicatedStorage.game.Items).getItemData, 1) do 
