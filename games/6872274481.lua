@@ -19983,115 +19983,18 @@ run(function()
 end)
 
 run(function()
-		local NoCollision
+	local NoCollision
 	local connections = {}
-	local trackedParts = {}
-	local lastWeaponState = nil
-	local weaponCheckCounter = 0
 
-	-- ── MineThroughPlayers raycast dependencies ──────────────────────────────
 	local Players = game:GetService("Players")
 	local player = Players.LocalPlayer
 
-	local getItemMeta    = require(game:GetService("ReplicatedStorage").TS.item["item-meta"]).getItemMeta
-	local EntityUtil     = require(game:GetService("ReplicatedStorage").TS.entity["entity-util"]).EntityUtil
-	local BlockEngine    = require(game:GetService("ReplicatedStorage").rbxts_include.node_modules["@easy-games"]["block-engine"].out).BlockEngine
+	local getItemMeta = require(game:GetService("ReplicatedStorage").TS.item["item-meta"]).getItemMeta
+	local EntityUtil  = require(game:GetService("ReplicatedStorage").TS.entity["entity-util"]).EntityUtil
+	local BlockEngine = require(game:GetService("ReplicatedStorage").rbxts_include.node_modules["@easy-games"]["block-engine"].out).BlockEngine
 	local BlockSelectorMode = require(
 		game:GetService("ReplicatedStorage").rbxts_include.node_modules["@easy-games"]["block-engine"].out.client.select["block-selector"]
 	).BlockSelectorMode
-	-- ─────────────────────────────────────────────────────────────────────────
-
-	local function removeCollision(character)
-		if not character then return end
-		
-		local charParts = trackedParts[character]
-		if not charParts then
-			charParts = {}
-			trackedParts[character] = charParts
-			
-			for _, part in character:GetDescendants() do
-				if part:IsA("BasePart") then
-					table.insert(charParts, {part = part, origCollide = part.CanCollide, origQuery = part.CanQuery})
-					part.CanCollide = false
-					part.CanQuery = false
-				end
-			end
-		else
-			for _, entry in charParts do
-				if entry.part and entry.part.Parent then
-					entry.part.CanCollide = false
-					entry.part.CanQuery = false
-				end
-			end
-		end
-	end
-	
-	local function restoreCollision(character)
-		if not character then return end
-		
-		local charParts = trackedParts[character]
-		if charParts then
-			for _, entry in charParts do
-				if entry.part and entry.part.Parent then
-					entry.part.CanCollide = entry.origCollide
-					entry.part.CanQuery = entry.origQuery
-				end
-			end
-		end
-	end
-
-	local function updateAllCollisions(forceUpdate)
-		weaponCheckCounter = weaponCheckCounter + 1
-		local shouldCheck = forceUpdate or (weaponCheckCounter % 3 == 0)
-		
-		if not shouldCheck then return end
-		
-		local isWeaponEquipped = hasValidWeapon()
-		
-		if not forceUpdate and lastWeaponState == isWeaponEquipped then
-			return
-		end
-		
-		lastWeaponState = isWeaponEquipped
-		
-		for _, entity in entitylib.List do
-			if entity.Character and entity.Character.Parent then
-				if isWeaponEquipped then
-					restoreCollision(entity.Character)
-				else
-					removeCollision(entity.Character)
-				end
-			end
-		end
-	end
-	
-	local motorParts = {}
-	local function updateMotorParts()
-		for _, entity in entitylib.List do
-			if entity.Character then
-				local charMotors = motorParts[entity.Character]
-				
-				if not charMotors then
-					charMotors = {}
-					motorParts[entity.Character] = charMotors
-					
-					for _, part in entity.Character:GetChildren() do
-						if part:IsA("BasePart") and part.Name == "Part" and part:FindFirstChildOfClass("Motor6D") then
-							table.insert(charMotors, part)
-						end
-					end
-				end
-				
-				for _, part in charMotors do
-					if part and part.Parent then
-						part.CanCollide = false
-					end
-				end
-			end
-		end
-	end
-
-	-- ── Raycast helpers (ported from MineThroughPlayers) ─────────────────────
 
 	local function canBreakBlocks()
 		local entity = EntityUtil:getLocalPlayerEntity()
@@ -20102,8 +20005,6 @@ run(function()
 		return itemMeta and itemMeta.breakBlock ~= nil
 	end
 
-	-- Performs a raycast that ignores all player characters, returning a
-	-- MineThroughPlayers-style target table or nil.
 	local function raycastThroughPlayers(originRay, range)
 		local params = RaycastParams.new()
 		params.FilterType = Enum.RaycastFilterType.Blacklist
@@ -20130,18 +20031,14 @@ run(function()
 		local dist = (result.Position - playerRoot.Position).Magnitude
 		if dist > 18 then return nil end
 
-		local blockPos = BlockEngine:getBlockPosition(blockInstance.Position)
-
 		return {
 			blockInstance = blockInstance,
-			blockRef      = { blockPosition = blockPos },
+			blockRef      = { blockPosition = BlockEngine:getBlockPosition(blockInstance.Position) },
 			hitPosition   = result.Position,
 			hitNormal     = result.Normal,
 		}
 	end
 
-	-- Patches blockBreaker so that when a normal raycast fails (e.g. blocked by
-	-- a player model) it falls back to the through-players raycast.
 	local function patchBlockBreaker(BlockBreakController)
 		local blockBreaker  = BlockBreakController.blockBreaker
 		local blockSelector = blockBreaker.clientManager:getBlockSelector()
@@ -20165,7 +20062,6 @@ run(function()
 				return originalHitBlock(self, maid, customRay)
 			end
 
-			-- Try the normal path first
 			local normalResult = blockSelector:getMouseInfo(BlockSelectorMode.SELECT, {
 				ray   = customRay,
 				range = self.range,
@@ -20175,7 +20071,6 @@ run(function()
 				return originalHitBlock(self, maid, customRay)
 			end
 
-			-- Fall back: raycast ignoring all players
 			local mouse = self.clientManager:getBlockSelector().mouse
 			local ray   = customRay or mouse.UnitRay
 			local target = raycastThroughPlayers(ray, self.range)
@@ -20184,19 +20079,15 @@ run(function()
 				return originalHitBlock(self, maid, customRay)
 			end
 
-			-- Let our hooked getMouseInfo return the custom target
 			pendingCustomBlock = target
 			return originalHitBlock(self, maid, customRay)
 		end
 	end
 
-	-- ─────────────────────────────────────────────────────────────────────────
-
 	NoCollision = vape.Categories.World:CreateModule({
 		Name = 'NoCollision',
 		Function = function(callback)
 			if callback then
-				-- Patch the block breaker for raycast-through-players support
 				local Knit = debug.getupvalue(require(player.PlayerScripts.TS.knit).setup, 9)
 				repeat task.wait() until debug.getupvalue(Knit.Start, 1)
 
@@ -20206,99 +20097,17 @@ run(function()
 				else
 					warn("[NoCollision] BlockBreakController not found – raycast patch skipped")
 				end
-
-				-- Existing heartbeat / collision logic
-				local frameCounter = 0
-				local heartbeatConn = runService.Heartbeat:Connect(function()
-					if not NoCollision.Enabled then return end
-					
-					frameCounter = frameCounter + 1
-					
-					if frameCounter % 6 == 0 then
-						updateAllCollisions(false)
-					end
-					
-					if frameCounter % 15 == 0 then
-						updateMotorParts()
-					end
-				end)
-				table.insert(connections, heartbeatConn)
-				
-				lastWeaponState = hasValidWeapon()
-				for _, entity in entitylib.List do
-					if entity.Character and entity.Character.Parent then
-						if not lastWeaponState then
-							removeCollision(entity.Character)
-						end
-					end
-				end
-				
-				local entityAddedConn = entitylib.Events.EntityAdded:Connect(function(entity)
-					if not NoCollision.Enabled then return end
-					if entity.Character then
-						task.wait(0.05)
-						if not hasValidWeapon() then
-							removeCollision(entity.Character)
-						end
-					end
-				end)
-				table.insert(connections, entityAddedConn)
-				
-				local entityRemovedConn = entitylib.Events.EntityRemoved:Connect(function(entity)
-					if entity.Character then
-						trackedParts[entity.Character] = nil
-						motorParts[entity.Character] = nil
-					end
-				end)
-				table.insert(connections, entityRemovedConn)
-				
-				if vapeEvents and vapeEvents.InventoryChanged then
-					local inventoryConn = vapeEvents.InventoryChanged.Event:Connect(function()
-						if NoCollision.Enabled then
-							updateAllCollisions(true)
-						end
-					end)
-					table.insert(connections, inventoryConn)
-				else
-					local lastTool = store.hand and store.hand.tool
-					local toolFrameCounter = 0
-					local monitorConn = runService.Heartbeat:Connect(function()
-						if not NoCollision.Enabled then return end
-						
-						toolFrameCounter = toolFrameCounter + 1
-						if toolFrameCounter % 5 == 0 then
-							local currentTool = store.hand and store.hand.tool
-							if currentTool ~= lastTool then
-								lastTool = currentTool
-								updateAllCollisions(true)
-							end
-						end
-					end)
-					table.insert(connections, monitorConn)
-				end
-				
-				updateAllCollisions(true)
 			else
 				for _, conn in connections do
 					conn:Disconnect()
 				end
 				table.clear(connections)
-				
-				for _, entity in entitylib.List do
-					if entity.Character then
-						restoreCollision(entity.Character)
-					end
-				end
-			
-				table.clear(trackedParts)
-				table.clear(motorParts)
-				lastWeaponState = nil
-				weaponCheckCounter = 0
 			end
 		end,
 		Tooltip = 'Mine/build through players and NPCs'
 	})
 end)
+
 
 
 run(function()
