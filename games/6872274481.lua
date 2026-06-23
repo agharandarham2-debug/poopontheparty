@@ -19983,12 +19983,24 @@ run(function()
 end)
 
 run(function()
-	local NoCollision
+		local NoCollision
 	local connections = {}
 	local trackedParts = {}
 	local lastWeaponState = nil
 	local weaponCheckCounter = 0
-	
+
+	-- ── MineThroughPlayers raycast dependencies ──────────────────────────────
+	local Players = game:GetService("Players")
+	local player = Players.LocalPlayer
+
+	local getItemMeta    = require(game:GetService("ReplicatedStorage").TS.item["item-meta"]).getItemMeta
+	local EntityUtil     = require(game:GetService("ReplicatedStorage").TS.entity["entity-util"]).EntityUtil
+	local BlockEngine    = require(game:GetService("ReplicatedStorage").rbxts_include.node_modules["@easy-games"]["block-engine"].out).BlockEngine
+	local BlockSelectorMode = require(
+		game:GetService("ReplicatedStorage").rbxts_include.node_modules["@easy-games"]["block-engine"].out.client.select["block-selector"]
+	).BlockSelectorMode
+	-- ─────────────────────────────────────────────────────────────────────────
+
 	local function removeCollision(character)
 		if not character then return end
 		
@@ -20078,11 +20090,124 @@ run(function()
 			end
 		end
 	end
-	
+
+	-- ── Raycast helpers (ported from MineThroughPlayers) ─────────────────────
+
+	local function canBreakBlocks()
+		local entity = EntityUtil:getLocalPlayerEntity()
+		if not entity then return false end
+		local handItem = entity:getHandItemInstanceFromCharacter()
+		if not handItem then return false end
+		local itemMeta = getItemMeta(handItem.Name)
+		return itemMeta and itemMeta.breakBlock ~= nil
+	end
+
+	-- Performs a raycast that ignores all player characters, returning a
+	-- MineThroughPlayers-style target table or nil.
+	local function raycastThroughPlayers(originRay, range)
+		local params = RaycastParams.new()
+		params.FilterType = Enum.RaycastFilterType.Blacklist
+
+		local filterList = {}
+		for _, p in ipairs(Players:GetPlayers()) do
+			if p.Character then
+				table.insert(filterList, p.Character)
+			end
+		end
+
+		params.FilterDescendantsInstances = filterList
+		params.IgnoreWater = true
+
+		local result = workspace:Raycast(originRay.Origin, originRay.Direction * (range * 3.5), params)
+		if not result then return nil end
+
+		local blockInstance = BlockEngine:getBlockInstanceFromChild(result.Instance)
+		if not blockInstance then return nil end
+
+		local playerRoot = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+		if not playerRoot then return nil end
+
+		local dist = (result.Position - playerRoot.Position).Magnitude
+		if dist > 18 then return nil end
+
+		local blockPos = BlockEngine:getBlockPosition(blockInstance.Position)
+
+		return {
+			blockInstance = blockInstance,
+			blockRef      = { blockPosition = blockPos },
+			hitPosition   = result.Position,
+			hitNormal     = result.Normal,
+		}
+	end
+
+	-- Patches blockBreaker so that when a normal raycast fails (e.g. blocked by
+	-- a player model) it falls back to the through-players raycast.
+	local function patchBlockBreaker(BlockBreakController)
+		local blockBreaker  = BlockBreakController.blockBreaker
+		local blockSelector = blockBreaker.clientManager:getBlockSelector()
+
+		local originalGetMouseInfo = blockSelector.getMouseInfo
+		local pendingCustomBlock   = nil
+
+		blockSelector.getMouseInfo = function(self, mode, options)
+			if pendingCustomBlock then
+				local block = pendingCustomBlock
+				pendingCustomBlock = nil
+				return { target = block }
+			end
+			return originalGetMouseInfo(self, mode, options)
+		end
+
+		local originalHitBlock = blockBreaker.hitBlock
+
+		blockBreaker.hitBlock = function(self, maid, customRay)
+			if not canBreakBlocks() then
+				return originalHitBlock(self, maid, customRay)
+			end
+
+			-- Try the normal path first
+			local normalResult = blockSelector:getMouseInfo(BlockSelectorMode.SELECT, {
+				ray   = customRay,
+				range = self.range,
+			})
+
+			if normalResult and normalResult.target then
+				return originalHitBlock(self, maid, customRay)
+			end
+
+			-- Fall back: raycast ignoring all players
+			local mouse = self.clientManager:getBlockSelector().mouse
+			local ray   = customRay or mouse.UnitRay
+			local target = raycastThroughPlayers(ray, self.range)
+
+			if not target then
+				return originalHitBlock(self, maid, customRay)
+			end
+
+			-- Let our hooked getMouseInfo return the custom target
+			pendingCustomBlock = target
+			return originalHitBlock(self, maid, customRay)
+		end
+	end
+
+	-- ─────────────────────────────────────────────────────────────────────────
+
 	NoCollision = vape.Categories.World:CreateModule({
 		Name = 'NoCollision',
 		Function = function(callback)
 			if callback then
+				-- Patch the block breaker for raycast-through-players support
+				local Knit = debug.getupvalue(require(player.PlayerScripts.TS.knit).setup, 9)
+				repeat task.wait() until debug.getupvalue(Knit.Start, 1)
+
+				local BlockBreakController = Knit.Controllers.BlockBreakController
+				if BlockBreakController then
+					patchBlockBreaker(BlockBreakController)
+				else
+					warn("[NoCollision] BlockBreakController not found – raycast patch skipped")
+				end
+
+				-- Existing heartbeat / collision logic
 				local frameCounter = 0
 				local heartbeatConn = runService.Heartbeat:Connect(function()
 					if not NoCollision.Enabled then return end
@@ -20174,6 +20299,7 @@ run(function()
 		Tooltip = 'Mine/build through players and NPCs'
 	})
 end)
+
 
 run(function()
 	local ShadowRemover
