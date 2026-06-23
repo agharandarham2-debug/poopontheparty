@@ -19983,31 +19983,38 @@ run(function()
 end)
 
 run(function()
-	local NoCollision
-	local connections = {}
+		local NoCollision
 
 	local Players = game:GetService("Players")
 	local player = Players.LocalPlayer
 
-	local getItemMeta = require(game:GetService("ReplicatedStorage").TS.item["item-meta"]).getItemMeta
-	local EntityUtil  = require(game:GetService("ReplicatedStorage").TS.entity["entity-util"]).EntityUtil
 	local BlockEngine = require(game:GetService("ReplicatedStorage").rbxts_include.node_modules["@easy-games"]["block-engine"].out).BlockEngine
 	local BlockSelectorMode = require(
 		game:GetService("ReplicatedStorage").rbxts_include.node_modules["@easy-games"]["block-engine"].out.client.select["block-selector"]
 	).BlockSelectorMode
 
-	local function canBreakBlocks()
-		local entity = EntityUtil:getLocalPlayerEntity()
-		if not entity then return false end
-		local handItem = entity:getHandItemInstanceFromCharacter()
-		if not handItem then return false end
-		local itemMeta = getItemMeta(handItem.Name)
-		return itemMeta and itemMeta.breakBlock ~= nil
-	end
+	local originalGetMouseInfo = nil
 
-	local function raycastThroughPlayers(originRay, range)
+	local function hookedGetMouseInfo(self, mode, options)
+		local result = originalGetMouseInfo(self, mode, options)
+
+		-- If a block was found normally, just return it
+		if result and result.target then
+			return result
+		end
+
+		-- Normal raycast missed (likely a player was in the way) — retry ignoring all characters
+		local ray = options and options.ray
+		if not ray then
+			ray = self.mouse and self.mouse.UnitRay
+		end
+		if not ray then return result end
+
+		local range = (options and options.range) or 10
+
 		local params = RaycastParams.new()
 		params.FilterType = Enum.RaycastFilterType.Blacklist
+		params.IgnoreWater = true
 
 		local filterList = {}
 		for _, p in ipairs(Players:GetPlayers()) do
@@ -20015,73 +20022,25 @@ run(function()
 				table.insert(filterList, p.Character)
 			end
 		end
-
 		params.FilterDescendantsInstances = filterList
-		params.IgnoreWater = true
 
-		local result = workspace:Raycast(originRay.Origin, originRay.Direction * (range * 3.5), params)
-		if not result then return nil end
+		local hit = workspace:Raycast(ray.Origin, ray.Direction * (range * 3.5), params)
+		if not hit then return result end
 
-		local blockInstance = BlockEngine:getBlockInstanceFromChild(result.Instance)
-		if not blockInstance then return nil end
+		local blockInstance = BlockEngine:getBlockInstanceFromChild(hit.Instance)
+		if not blockInstance then return result end
 
-		local playerRoot = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-		if not playerRoot then return nil end
-
-		local dist = (result.Position - playerRoot.Position).Magnitude
-		if dist > 18 then return nil end
+		local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+		if root and (hit.Position - root.Position).Magnitude > 18 then return result end
 
 		return {
-			blockInstance = blockInstance,
-			blockRef      = { blockPosition = BlockEngine:getBlockPosition(blockInstance.Position) },
-			hitPosition   = result.Position,
-			hitNormal     = result.Normal,
+			target = {
+				blockInstance = blockInstance,
+				blockRef      = { blockPosition = BlockEngine:getBlockPosition(blockInstance.Position) },
+				hitPosition   = hit.Position,
+				hitNormal     = hit.Normal,
+			}
 		}
-	end
-
-	local function patchBlockBreaker(BlockBreakController)
-		local blockBreaker  = BlockBreakController.blockBreaker
-		local blockSelector = blockBreaker.clientManager:getBlockSelector()
-
-		local originalGetMouseInfo = blockSelector.getMouseInfo
-		local pendingCustomBlock   = nil
-
-		blockSelector.getMouseInfo = function(self, mode, options)
-			if pendingCustomBlock then
-				local block = pendingCustomBlock
-				pendingCustomBlock = nil
-				return { target = block }
-			end
-			return originalGetMouseInfo(self, mode, options)
-		end
-
-		local originalHitBlock = blockBreaker.hitBlock
-
-		blockBreaker.hitBlock = function(self, maid, customRay)
-			if not canBreakBlocks() then
-				return originalHitBlock(self, maid, customRay)
-			end
-
-			local normalResult = blockSelector:getMouseInfo(BlockSelectorMode.SELECT, {
-				ray   = customRay,
-				range = self.range,
-			})
-
-			if normalResult and normalResult.target then
-				return originalHitBlock(self, maid, customRay)
-			end
-
-			local mouse = self.clientManager:getBlockSelector().mouse
-			local ray   = customRay or mouse.UnitRay
-			local target = raycastThroughPlayers(ray, self.range)
-
-			if not target then
-				return originalHitBlock(self, maid, customRay)
-			end
-
-			pendingCustomBlock = target
-			return originalHitBlock(self, maid, customRay)
-		end
 	end
 
 	NoCollision = vape.Categories.World:CreateModule({
@@ -20092,23 +20051,29 @@ run(function()
 				repeat task.wait() until debug.getupvalue(Knit.Start, 1)
 
 				local BlockBreakController = Knit.Controllers.BlockBreakController
-				if BlockBreakController then
-					patchBlockBreaker(BlockBreakController)
-				else
-					warn("[NoCollision] BlockBreakController not found – raycast patch skipped")
+				if not BlockBreakController then
+					warn("[NoCollision] BlockBreakController not found")
+					return
 				end
+
+				local blockSelector = BlockBreakController.blockBreaker.clientManager:getBlockSelector()
+				originalGetMouseInfo = blockSelector.getMouseInfo
+				blockSelector.getMouseInfo = hookedGetMouseInfo
 			else
-				for _, conn in connections do
-					conn:Disconnect()
+				-- Restore original on disable
+				if originalGetMouseInfo then
+					local BlockBreakController = Knit.Controllers.BlockBreakController
+					if BlockBreakController then
+						local blockSelector = BlockBreakController.blockBreaker.clientManager:getBlockSelector()
+						blockSelector.getMouseInfo = originalGetMouseInfo
+					end
+					originalGetMouseInfo = nil
 				end
-				table.clear(connections)
 			end
 		end,
 		Tooltip = 'Mine/build through players and NPCs'
 	})
 end)
-
-
 
 run(function()
 	local ShadowRemover
