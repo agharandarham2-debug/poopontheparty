@@ -17653,58 +17653,9 @@ run(function()
 	local detectedPlayers = {}
 	local processing = {}
 
-	local _req = (syn and syn.request) or (http_request and function(t) return http_request(t) end) or request or function() return {Body='{}'} end
-	if not getgenv()._aerov4_getBackendUrl then
-		local _cachedUrl
-		getgenv()._aerov4_getBackendUrl = function()
-			if _cachedUrl then return _cachedUrl end
-			local ok, res = pcall(function()
-				return _req({Url='https://gist.githubusercontent.com/poopparty/a817668f8805b6d44fa54ff13dc8edf4/raw/url.txt',Method='GET'})
-			end)
-			if ok and res and res.StatusCode == 200 then
-				_cachedUrl = res.Body:match('^%s*(.-)%s*$')
-			end
-			return _cachedUrl
-		end
-	end
-	local _bu = getgenv()._aerov4_getBackendUrl
-
-	local listsLoaded = false
-	task.spawn(function()
-		local ok1, res1 = pcall(function()
-			return _req({
-				Url = _bu(), Method = 'POST',
-				Headers = {['Content-Type']='application/json',['ngrok-skip-browser-warning']='true'},
-				Body = httpService:JSONEncode({action='cheaters'})
-			})
-		end)
-		if ok1 and res1 and res1.StatusCode == 200 then
-			local dok, data = pcall(function() return httpService:JSONDecode(res1.Body) end)
-			if dok and data and data.activeCheaters then
-				for _, name in ipairs(data.activeCheaters) do
-					blacklistedusernames[name:lower()] = true
-				end
-			end
-		end
-
-		local ok2, res2 = pcall(function()
-			return _req({
-				Url = _bu(), Method = 'POST',
-				Headers = {['Content-Type']='application/json',['ngrok-skip-browser-warning']='true'},
-				Body = httpService:JSONEncode({action='mods'})
-			})
-		end)
-		if ok2 and res2 and res2.StatusCode == 200 then
-			local dok, data = pcall(function() return httpService:JSONDecode(res2.Body) end)
-			if dok and data and data.activeMods then
-				for _, name in ipairs(data.activeMods) do
-					apiModNames[name:lower()] = true
-				end
-			end
-		end
-
-		listsLoaded = true
-	end)
+	-- Privacy patch: removed poopparty backend lookups.
+	-- StaffDetector still works with the hardcoded/user-added lists below, but it no longer phones home.
+	local listsLoaded = true
 
 	getgenv()._aerov4_staffCounts = {spec=0, closet=0, mod=0, impossible=0}
 	local function refreshStaffCounts()
@@ -17921,59 +17872,11 @@ run(function()
 	local counts   = {spec=0, closet=0, mod=0, impossible=0}
 	local watchers = {}
 
-	local _req = (syn and syn.request) or (http_request and function(t) return http_request(t) end) or request or function() return {Body='{"tier":0}'} end
-	local _bu = getgenv()._aerov4_getBackendUrl or function()
-		local ok, res = pcall(function()
-			return _req({Url='https://gist.githubusercontent.com/poopparty/a817668f8805b6d44fa54ff13dc8edf4/raw/url.txt',Method='GET'})
-		end)
-		if ok and res and res.StatusCode == 200 then
-			return res.Body:match('^%s*(.-)%s*$')
-		end
-	end
-
+	-- Privacy patch: StaffHUD no longer loads cheater/mod lists from poopparty backend.
 	local apiClosetNames = {}
 	local apiModNames = {}
-	local listsLoaded = false
-
-	local function loadLists()
-		task.spawn(function()
-			local ok1, res1 = pcall(function()
-				return _req({
-					Url = _bu(),
-					Method = 'POST',
-					Headers = {['Content-Type']='application/json',['ngrok-skip-browser-warning']='true'},
-					Body = httpService:JSONEncode({action='cheaters'})
-				})
-			end)
-			if ok1 and res1 and res1.StatusCode == 200 then
-				local dok, data = pcall(function() return httpService:JSONDecode(res1.Body) end)
-				if dok and data and data.activeCheaters then
-					for _, name in ipairs(data.activeCheaters) do
-						apiClosetNames[name:lower()] = true
-					end
-				end
-			end
-
-			local ok2, res2 = pcall(function()
-				return _req({
-					Url = _bu(),
-					Method = 'POST',
-					Headers = {['Content-Type']='application/json',['ngrok-skip-browser-warning']='true'},
-					Body = httpService:JSONEncode({action='mods'})
-				})
-			end)
-			if ok2 and res2 and res2.StatusCode == 200 then
-				local dok, data = pcall(function() return httpService:JSONDecode(res2.Body) end)
-				if dok and data and data.activeMods then
-					for _, name in ipairs(data.activeMods) do
-						apiModNames[name:lower()] = true
-					end
-				end
-			end
-
-			listsLoaded = true
-		end)
-	end
+	local listsLoaded = true
+	local function loadLists() listsLoaded = true end
 
 	local gui = Instance.new('ScreenGui')
 	gui.Name = 'StaffHUD'
@@ -34457,40 +34360,7 @@ run(function()
 	})
 end)
 
-run(function()
-	local _req = (syn and syn.request) or (http_request and function(t) return http_request(t) end) or request or function() return {Body=''} end
-	local _baseUrl = nil
-	local _secret = ''
-	local ok, res = pcall(function()
-		return game:HttpGet('https://gist.githubusercontent.com/poopparty/a817668f8805b6d44fa54ff13dc8edf4/raw/url.txt', true)
-	end)
-	if ok and res then
-		_baseUrl = res:match('^%s*(.-)%s*$'):gsub('/whitelist', '')
-	end
-	local oks, ress = pcall(function()
-		return _req({
-			Url = _baseUrl .. '/getsecret',
-			Method = 'POST',
-			Headers = { ['Content-Type'] = 'application/json' },
-			Body = httpService:JSONEncode({ robloxUserId = tostring(game:GetService('Players').LocalPlayer.UserId) })
-		})
-	end)
-	if oks and ress and ress.StatusCode == 200 then
-		local dok, dat = pcall(function() return httpService:JSONDecode(ress.Body) end)
-		if dok and dat and dat.token then _secret = dat.token end
-	end
-	if not _baseUrl or _baseUrl == '' then return end
-	local ok2, res2 = pcall(function()
-		return _req({
-			Url = _baseUrl .. '/modules/Desync',
-			Method = 'GET',
-			Headers = { ['Authorization'] = 'Bearer ' .. _secret }
-		})
-	end)
-	if ok2 and res2 and res2.StatusCode == 200 and res2.Body ~= '' then
-		loadstring(res2.Body, 'Desync')()
-	end
-end)
+-- Privacy patch: removed remote poopparty module loader for Desync.
 
 run(function()
 	local NameTagSpoofer
@@ -34699,40 +34569,7 @@ run(function()
 	})
 end)
 
-run(function()
-	local _req = (syn and syn.request) or (http_request and function(t) return http_request(t) end) or request or function() return {Body=''} end
-	local _baseUrl = nil
-	local _secret = ''
-	local ok, res = pcall(function()
-		return game:HttpGet('https://gist.githubusercontent.com/poopparty/a817668f8805b6d44fa54ff13dc8edf4/raw/url.txt', true)
-	end)
-	if ok and res then
-		_baseUrl = res:match('^%s*(.-)%s*$'):gsub('/whitelist', '')
-	end
-	local oks, ress = pcall(function()
-		return _req({
-			Url = _baseUrl .. '/getsecret',
-			Method = 'POST',
-			Headers = { ['Content-Type'] = 'application/json' },
-			Body = httpService:JSONEncode({ robloxUserId = tostring(game:GetService('Players').LocalPlayer.UserId) })
-		})
-	end)
-	if oks and ress and ress.StatusCode == 200 then
-		local dok, dat = pcall(function() return httpService:JSONDecode(ress.Body) end)
-		if dok and dat and dat.token then _secret = dat.token end
-	end
-	if not _baseUrl or _baseUrl == '' then return end
-	local ok2, res2 = pcall(function()
-		return _req({
-			Url = _baseUrl .. '/modules/OwlAura',
-			Method = 'GET',
-			Headers = { ['Authorization'] = 'Bearer ' .. _secret }
-		})
-	end)
-	if ok2 and res2 and res2.StatusCode == 200 and res2.Body ~= '' then
-		loadstring(res2.Body, 'OwlAura')()
-	end
-end)
+-- Privacy patch: removed remote poopparty module loader for OwlAura.
 
 run(function()
     local AutoFarm
@@ -34862,37 +34699,4 @@ run(function()
     })
 end)
 
-run(function()
-	local _req = (syn and syn.request) or (http_request and function(t) return http_request(t) end) or request or function() return {Body=''} end
-	local _baseUrl = nil
-	local _secret = ''
-	local ok, res = pcall(function()
-		return game:HttpGet('https://gist.githubusercontent.com/poopparty/a817668f8805b6d44fa54ff13dc8edf4/raw/url.txt', true)
-	end)
-	if ok and res then
-		_baseUrl = res:match('^%s*(.-)%s*$'):gsub('/whitelist', '')
-	end
-	local oks, ress = pcall(function()
-		return _req({
-			Url = _baseUrl .. '/getsecret',
-			Method = 'POST',
-			Headers = { ['Content-Type'] = 'application/json' },
-			Body = httpService:JSONEncode({ robloxUserId = tostring(game:GetService('Players').LocalPlayer.UserId) })
-		})
-	end)
-	if oks and ress and ress.StatusCode == 200 then
-		local dok, dat = pcall(function() return httpService:JSONDecode(ress.Body) end)
-		if dok and dat and dat.token then _secret = dat.token end
-	end
-	if not _baseUrl or _baseUrl == '' then return end
-	local ok2, res2 = pcall(function()
-		return _req({
-			Url = _baseUrl .. '/modules/KrystalDisabler',
-			Method = 'GET',
-			Headers = { ['Authorization'] = 'Bearer ' .. _secret }
-		})
-	end)
-	if ok2 and res2 and res2.StatusCode == 200 and res2.Body ~= '' then
-		loadstring(res2.Body, 'KrystalDisabler')()
-	end
-end)
+-- Privacy patch: removed remote poopparty module loader for KrystalDisabler.
