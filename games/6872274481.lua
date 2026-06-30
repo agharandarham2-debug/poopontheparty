@@ -15303,290 +15303,211 @@ end)
 run(function()
     local BedPlates
     local Background
-    local TeamColor
-    local Color = {}
+    local Color
+    local LayerCounter
+    local LayerColor
     local Reference = {}
-    local BlockCache = {} 
     local Folder = Instance.new('Folder')
     Folder.Parent = vape.gui
     
-	local teamColors = {
-		[1] = {name = "Blue",   color = Color3.fromRGB(85, 150, 255)},
-		[2] = {name = "Orange", color = Color3.fromRGB(255, 150, 50)},
-		[3] = {name = "Pink",   color = Color3.fromRGB(255, 100, 200)},
-		[4] = {name = "Yellow", color = Color3.fromRGB(255, 255, 50)}
-	}
+    local function getBlockLayerHealth(block)
+    	local meta = bedwars.ItemMeta[block]
+    	return meta and meta.block and meta.block.health or 0
+    end
     
-    local function getBedTeamColor(bed)
-        local teamId = bed:GetAttribute('TeamID')
-        if teamId and teamColors[teamId] then
-            return teamColors[teamId]
-        end
-        return Color3.new(1, 1, 1)
+    local function getLayerColor()
+    	return LayerColor and Color3.fromHSV(LayerColor.Hue, LayerColor.Sat, LayerColor.Value) or Color3.new(1, 1, 1)
     end
     
     local function scanSide(self, start, tab)
-        for _, side in ipairs(sides) do
-            for i = 1, 15 do
-                local block = getPlacedBlock(start + (side * i))
-                if not block or block == self then break end
-                if not block:GetAttribute('NoBreak') and not table.find(tab, block.Name) then
-                    table.insert(tab, block.Name)
-                end
-            end
-        end
+    	for _, side in sides do
+    		local layers = {}
+    		for i = 1, 15 do
+    			local block = getPlacedBlock(start + (side * i))
+    			if not block or block == self or block.Name == 'bed' then
+    				break
+    			end
+    			if not block:GetAttribute('NoBreak') then
+    				layers[block.Name] = (layers[block.Name] or 0) + 1
+    			end
+    		end
+    
+    		for block, amount in layers do
+    			tab[block] = math.max(tab[block] or 0, amount)
+    		end
+    	end
     end
     
     local function refreshAdornee(v)
-        local start = v.Adornee.Position
-        
-        local newBlocks = {}
-        scanSide(v.Adornee, start, newBlocks)
-        scanSide(v.Adornee, start + Vector3.new(0, 0, 3), newBlocks)
-        
-        table.sort(newBlocks, function(a, b)
-            local aMeta = bedwars.ItemMeta[a]
-            local bMeta = bedwars.ItemMeta[b]
-            local aHealth = aMeta and aMeta.block and aMeta.block.health or 0
-            local bHealth = bMeta and bMeta.block and bMeta.block.health or 0
-            return aHealth > bHealth
-        end)
-        
-        local blockKey = table.concat(newBlocks, ",")
-        
-        if BlockCache[v] == blockKey then
-            v.Enabled = #newBlocks > 0
-            return
-        end
-        BlockCache[v] = blockKey
-        
-        local children = v.Frame:GetChildren()
-        for _, obj in ipairs(children) do
-            if obj:IsA('ImageLabel') and obj.Name ~= 'Blur' then
-                obj:Destroy()
-            end
-        end
-        
-        v.Enabled = #newBlocks > 0
-        
-        for _, block in ipairs(newBlocks) do
-            local blockimage = Instance.new('ImageLabel')
-            blockimage.Size = UDim2.fromOffset(32, 32)
-            blockimage.BackgroundTransparency = 1
-            blockimage.Image = bedwars.getIcon({itemType = block}, true)
-            blockimage.Parent = v.Frame
-        end
+    	for _, obj in v.Frame:GetChildren() do
+    		if obj:IsA('ImageLabel') and obj.Name ~= 'Blur' then
+    			obj:Destroy()
+    		end
+    	end
+    
+    	local start = v.Adornee.Position
+    	local layers = {}
+    	local alreadygot = {}
+    	scanSide(v.Adornee, start, layers)
+    	scanSide(v.Adornee, start + Vector3.new(0, 0, 3), layers)
+    	for block, amount in layers do
+    		table.insert(alreadygot, {block, amount})
+    	end
+    	table.sort(alreadygot, function(a, b)
+    		local healthA, healthB = getBlockLayerHealth(a[1]), getBlockLayerHealth(b[1])
+    		return healthA == healthB and a[1] < b[1] or healthA > healthB
+    	end)
+    	v.Enabled = #alreadygot > 0
+    
+    	for _, blockData in alreadygot do
+    		local block, amount = blockData[1], blockData[2]
+    		local blockimage = Instance.new('ImageLabel')
+    		blockimage.Size = UDim2.fromOffset(32, 32)
+    		blockimage.BackgroundTransparency = 1
+    		blockimage.Image = bedwars.getIcon({ itemType = block }, true)
+    		blockimage.Parent = v.Frame
+    		if amount > 1 and (not LayerCounter or LayerCounter.Enabled) then
+    			local amounttext = Instance.new('TextLabel')
+    			amounttext.Name = 'Amount'
+    			amounttext.Size = UDim2.fromScale(1, 1)
+    			amounttext.BackgroundTransparency = 1
+    			amounttext.Text = tostring(amount)
+    			amounttext.TextColor3 = getLayerColor()
+    			amounttext.TextSize = 16
+    			amounttext.TextStrokeTransparency = 0.3
+    			amounttext.Font = Enum.Font.Arial
+    			amounttext.Parent = blockimage
+    		end
+    	end
+    end
+    
+    local function refreshAll()
+    	for _, v in Reference do
+    		refreshAdornee(v)
+    	end
+    end
+    
+    local function updateLayerTextColor()
+    	local textColor = getLayerColor()
+    	for _, v in Reference do
+    		for _, obj in v.Frame:GetDescendants() do
+    			if obj:IsA('TextLabel') and obj.Name == 'Amount' then
+    				obj.TextColor3 = textColor
+    			end
+    		end
+    	end
     end
     
     local function Added(v)
-        if Reference[v] then return end
-        local _bpUserId = v:GetAttribute('PlacedByUserId')
-        if _bpUserId then
-            local _bpOk, _bpOwner = pcall(function() return playersService:GetPlayerByUserId(_bpUserId) end)
-            if _bpOk and _bpOwner and getAccountTier(_bpOwner) >= 4 and getAccountTier(_bpOwner) < 99 and getAccountTier(lplr) == 0 then return end
-        end
-        
-        local billboard = Instance.new('BillboardGui')
-        billboard.Parent = Folder
-        billboard.Name = 'bed'
-        billboard.StudsOffsetWorldSpace = Vector3.new(0, 3, 0)
-        billboard.Size = UDim2.fromOffset(36, 36)
-        billboard.AlwaysOnTop = true
-        billboard.ClipsDescendants = false
-        billboard.Adornee = v
-        
-        local blur = addBlur(billboard)
-        blur.Visible = Background.Enabled
-        
-        local frame = Instance.new('Frame')
-        frame.Size = UDim2.fromScale(1, 1)
-        frame.BackgroundColor3 = TeamColor.Enabled and getBedTeamColor(v) or Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
-        frame.BackgroundTransparency = 1 - (Background.Enabled and (TeamColor.Enabled and 0.5 or Color.Opacity) or 0)
-        frame.Parent = billboard
-        
-        local layout = Instance.new('UIListLayout')
-        layout.FillDirection = Enum.FillDirection.Horizontal
-        layout.Padding = UDim.new(0, 4)
-        layout.VerticalAlignment = Enum.VerticalAlignment.Center
-        layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-        layout:GetPropertyChangedSignal('AbsoluteContentSize'):Connect(function()
-            billboard.Size = UDim2.fromOffset(math.max(layout.AbsoluteContentSize.X + 4, 36), 36)
-        end)
-        layout.Parent = frame
-        
-        local corner = Instance.new('UICorner')
-        corner.CornerRadius = UDim.new(0, 4)
-        corner.Parent = frame
-        
-        Reference[v] = billboard
-        BlockCache[v] = ""
-        refreshAdornee(billboard)
+    	local billboard = Instance.new('BillboardGui')
+    	billboard.Parent = Folder
+    	billboard.Name = 'bed'
+    	billboard.StudsOffsetWorldSpace = Vector3.new(0, 3, 0)
+    	billboard.Size = UDim2.fromOffset(36, 36)
+    	billboard.AlwaysOnTop = true
+    	billboard.ClipsDescendants = false
+    	billboard.Adornee = v
+    	local blur = addBlur(billboard)
+    	blur.Visible = Background.Enabled
+    	local frame = Instance.new('Frame')
+    	frame.Size = UDim2.fromScale(1, 1)
+    	frame.BackgroundColor3 = Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
+    	frame.BackgroundTransparency = 1 - (Background.Enabled and Color.Opacity or 0)
+    	frame.Parent = billboard
+    	local layout = Instance.new('UIListLayout')
+    	layout.FillDirection = Enum.FillDirection.Horizontal
+    	layout.Padding = UDim.new(0, 4)
+    	layout.VerticalAlignment = Enum.VerticalAlignment.Center
+    	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    	layout:GetPropertyChangedSignal('AbsoluteContentSize'):Connect(function()
+    		billboard.Size = UDim2.fromOffset(math.max(layout.AbsoluteContentSize.X + 4, 36), 36)
+    	end)
+    	layout.Parent = frame
+    	local corner = Instance.new('UICorner')
+    	corner.CornerRadius = UDim.new(0, 4)
+    	corner.Parent = frame
+    	Reference[v] = billboard
+    	refreshAdornee(billboard)
     end
     
-    local _refreshNearPending = false
     local function refreshNear(data)
-        if _refreshNearPending then return end
-        _refreshNearPending = true
-        task.defer(function()
-            _refreshNearPending = false
-            local blockPos = data.blockRef.blockPosition * 3
-            local maxDistanceSq = 30 * 30
-            for bed, billboard in pairs(Reference) do
-                if bed.Parent then
-                    local offset = blockPos - bed.Position
-                    local distanceSq = offset.X * offset.X + offset.Y * offset.Y + offset.Z * offset.Z
-                    if distanceSq <= maxDistanceSq then
-                        refreshAdornee(billboard)
-                    end
-                end
-            end
-        end)
+    	data = data.blockRef.blockPosition * 3
+    	for i, v in Reference do
+    		if (data - i.Position).Magnitude <= 30 then
+    			refreshAdornee(v)
+    		end
+    	end
     end
     
     BedPlates = vape.Categories.Minigames:CreateModule({
-        Name = 'BedPlates',
-        Function = function(callback)
-            if callback then
-                table.clear(BlockCache)
-                
-                local tagged = collectionService:GetTagged('bed')
-                for _, v in ipairs(tagged) do 
-                    Added(v)
-                end
-                
-                BedPlates:Clean(vapeEvents.PlaceBlockEvent.Event:Connect(refreshNear))
-                BedPlates:Clean(vapeEvents.BreakBlockEvent.Event:Connect(refreshNear))
-                BedPlates:Clean(collectionService:GetInstanceAddedSignal('bed'):Connect(Added))
-                BedPlates:Clean(collectionService:GetInstanceRemovedSignal('bed'):Connect(function(v)
-                    if Reference[v] then
-                        Reference[v]:Destroy()
-                        Reference[v] = nil
-                        BlockCache[v] = nil
-                    end
-                end))
-            else
-                for _, v in pairs(Reference) do
-                    v:Destroy()
-                end
-                table.clear(Reference)
-                table.clear(BlockCache)
-            end
-        end,
-        Tooltip = 'Displays blocks over the bed'
+    	Name = 'Bed Plates',
+    	Function = function(callback)
+    		if callback then
+    			for _, v in collectionService:GetTagged('bed') do
+    				task.spawn(Added, v)
+    			end
+    			BedPlates:Clean(vapeEvents.PlaceBlockEvent.Event:Connect(refreshNear))
+    			BedPlates:Clean(vapeEvents.BreakBlockEvent.Event:Connect(refreshNear))
+    			BedPlates:Clean(collectionService:GetInstanceAddedSignal('bed'):Connect(Added))
+    			BedPlates:Clean(collectionService:GetInstanceRemovedSignal('bed'):Connect(function(v)
+    				if Reference[v] then
+    					Reference[v]:Destroy()
+    					Reference[v]:ClearAllChildren()
+    					Reference[v] = nil
+    				end
+    			end))
+    		else
+    			table.clear(Reference)
+    			Folder:ClearAllChildren()
+    		end
+    	end,
+    	Tooltip = 'Displays blocks over the bed',
     })
-    
     Background = BedPlates:CreateToggle({
-        Name = 'Background',
-        Function = function(callback)
-            if Color.Object then 
-                Color.Object.Visible = callback and not TeamColor.Enabled
-            end
-            for _, v in pairs(Reference) do
-                v.Frame.BackgroundTransparency = 1 - (callback and (TeamColor.Enabled and 0.5 or Color.Opacity) or 0)
-                local blur = v:FindFirstChild('Blur')
-                if blur then
-                    blur.Visible = callback
-                end
-            end
-        end,
-        Default = true
+    	Name = 'Background',
+    	Function = function(callback)
+    		if Color and Color.Object then
+    			Color.Object.Visible = callback
+    		end
+    		for _, v in Reference do
+    			v.Frame.BackgroundTransparency = 1 - (callback and Color.Opacity or 0)
+    			v.Blur.Visible = callback
+    		end
+    	end,
+    	Default = true,
     })
-    
-    TeamColor = BedPlates:CreateToggle({
-        Name = 'Team Color',
-        Tooltip = 'Use bed team color instead of custom color',
-        Default = true,
-        Function = function(callback)
-            if Color.Object then
-                Color.Object.Visible = Background.Enabled and not callback
-            end
-            for bed, billboard in pairs(Reference) do
-                billboard.Frame.BackgroundColor3 = callback and getBedTeamColor(bed) or Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
-                billboard.Frame.BackgroundTransparency = 1 - (Background.Enabled and (callback and 0.5 or Color.Opacity) or 0)
-            end
-        end
-    })
-    
     Color = BedPlates:CreateColorSlider({
-        Name = 'Background Color',
-        DefaultValue = 0,
-        DefaultOpacity = 0.5,
-        Function = function(hue, sat, val, opacity)
-            for bed, v in pairs(Reference) do
-                if not TeamColor.Enabled then
-                    v.Frame.BackgroundColor3 = Color3.fromHSV(hue, sat, val)
-                end
-                if Background.Enabled and not TeamColor.Enabled then
-                    v.Frame.BackgroundTransparency = 1 - opacity
-                end
-            end
-        end,
-        Visible = false,
-        Darker = true
+    	Name = 'Background Color',
+    	DefaultValue = 0,
+    	DefaultOpacity = 0.5,
+    	Function = function(hue, sat, val, opacity)
+    		for _, v in Reference do
+    			v.Frame.BackgroundColor3 = Color3.fromHSV(hue, sat, val)
+    			v.Frame.BackgroundTransparency = 1 - opacity
+    		end
+    	end,
+    	Darker = true,
+    })
+    LayerCounter = BedPlates:CreateToggle({
+    	Name = 'Layer Counter',
+    	Function = function(callback)
+    		if LayerColor and LayerColor.Object then
+    			LayerColor.Object.Visible = callback
+    		end
+    		refreshAll()
+    	end,
+    	Default = true,
+    })
+    LayerColor = BedPlates:CreateColorSlider({
+    	Name = 'Counter Text Color',
+    	DefaultSat = 0,
+    	DefaultValue = 1,
+    	Function = function()
+    		updateLayerTextColor()
+    	end,
+    	Visible = LayerCounter.Enabled,
     })
 end)
-
-run(function()
-	local Headless
-	local faceTransparencyBackup = nil
-
-	Headless = vape.Categories.Utility:CreateModule({
-		PerformanceModeBlacklisted = true,
-		Name = 'Headless',
-		Tooltip = 'free headless 2026',
-		Function = function(callback)
-			if callback then
-				local function applyHeadless()
-					if not (entitylib.isAlive and entitylib.character and entitylib.character.Character and entitylib.character.Head) then return end
-					local head = entitylib.character.Head
-					if faceTransparencyBackup == nil then
-						local face = head:FindFirstChild('face')
-						if face and face:IsA("Decal") then
-							faceTransparencyBackup = face.Transparency
-						end
-					end
-					head.Transparency = 1
-					local face = head:FindFirstChild('face')
-					if face and face:IsA("Decal") then
-						face.Transparency = 1
-					end
-				end
-
-				applyHeadless()
-
-				Headless:Clean(entitylib.Events.LocalAdded:Connect(function()
-					faceTransparencyBackup = nil
-					applyHeadless()
-				end))
-
-				Headless:Clean(vapeEvents.AttributeChanged.Event:Connect(function(attr)
-					if attr == 'Health' then
-						applyHeadless()
-					end
-				end))
-			else
-				if entitylib.isAlive and entitylib.character and entitylib.character.Character and entitylib.character.Head then
-					entitylib.character.Head.Transparency = 0
-					local face = entitylib.character.Head:FindFirstChild('face')
-					if face and face:IsA("Decal") then
-						face.Transparency = faceTransparencyBackup ~= nil and faceTransparencyBackup or 0
-						faceTransparencyBackup = nil
-					end
-				end
-			end
-		end,
-		Default = false
-	})
-end)
-
-local function safeIsBreakable(pos)
-    if not bedwars.BlockController then return false end
-    local ok, result = pcall(function()
-        return bedwars.BlockController:isBlockBreakable({blockPosition = pos / 3}, lplr)
-    end)
-    return ok and result
-end
-
 run(function()
 	local Breaker
 	local Range
