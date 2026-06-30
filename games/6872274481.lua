@@ -22871,7 +22871,7 @@ run(function()
 end)
 
 run(function()
-   local GeneratorESP
+    local GeneratorESP
     DiamondToggle = nil
     EmeraldToggle = nil
     TeamGenToggle = nil
@@ -22937,6 +22937,20 @@ run(function()
 
     local function getUIScaleValue()
         return UIScaleSlider and UIScaleSlider.Value or 1
+    end
+
+    local function scaledOffset(x, y)
+        local scale = getUIScaleValue()
+        return UDim2.fromOffset(x * scale, y * scale)
+    end
+
+    local function scaledPos(xScale, xOffset, yScale, yOffset)
+        local scale = getUIScaleValue()
+        return UDim2.new(xScale, xOffset * scale, yScale, yOffset * scale)
+    end
+
+    local function scaledText(size)
+        return math.max(1, size * getUIScaleValue())
     end
 
     local uicorner = Instance.new('UICorner')
@@ -23308,8 +23322,8 @@ run(function()
             local dot = Instance.new('Frame')
             dot.Name = 'TeamDot'
             dot.Parent = billboard
-            dot.Size = UDim2.fromOffset(8, 8)
-            dot.Position = UDim2.new(0, 10, 0, 5)
+            dot.Size = scaledOffset(8, 8)
+            dot.Position = scaledPos(0, 10, 0, 5)
             dot.BackgroundColor3 = displayColor
             dot.BorderSizePixel = 0
             local dotCorner = Instance.new('UICorner')
@@ -23320,11 +23334,11 @@ run(function()
             teamLabel.Name = 'TeamLabel'
             teamLabel.Parent = billboard
             teamLabel.BackgroundTransparency = 1
-            teamLabel.Size = UDim2.new(1, 0, 0, 18)
-            teamLabel.Position = UDim2.new(0, 0, 0, 0)
+            teamLabel.Size = scaledPos(1, 0, 0, 18)
+            teamLabel.Position = scaledPos(0, 0, 0, 0)
             teamLabel.Text = teamName
             teamLabel.TextColor3 = displayColor
-            teamLabel.TextSize = 13
+            teamLabel.TextSize = scaledText(13)
             teamLabel.Font = Enum.Font.GothamBold
             teamLabel.TextStrokeTransparency = 0.4
             teamLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
@@ -23332,24 +23346,19 @@ run(function()
         end
 
         local frame = Instance.new('Frame')
-        frame.Size = config.isTeamGen and UDim2.new(1, 0, 0, 35) or UDim2.fromScale(1, 1)
-        frame.Position = config.isTeamGen and UDim2.new(0, 0, 0, 20) or UDim2.new(0, 0, 0, 0)
+        frame.Size = config.isTeamGen and scaledPos(1, 0, 0, 35) or UDim2.fromScale(1, 1)
+        frame.Position = config.isTeamGen and scaledPos(0, 0, 0, 20) or UDim2.new(0, 0, 0, 0)
         frame.BackgroundColor3 = Color3.new(0, 0, 0)
         frame.BackgroundTransparency = 0.3
         frame.BorderSizePixel = 0
         frame.Parent = billboard
 
-        local billboardUIScale = Instance.new('UIScale')
-        billboardUIScale.Name = 'GeneratorESPScale'
-        billboardUIScale.Scale = uiScaleValue
-        billboardUIScale.Parent = frame
-
         if config.isTeamGen and teamId and teamColors[teamId] then
             local stripe = Instance.new('Frame')
             stripe.Name = 'TeamStripe'
             stripe.Parent = frame
-            stripe.Size = UDim2.new(0, 3, 1, 0)
-            stripe.Position = UDim2.new(0, 0, 0, 0)
+            stripe.Size = scaledPos(0, 3, 1, 0)
+            stripe.Position = scaledPos(0, 0, 0, 0)
             stripe.BackgroundColor3 = displayColor
             stripe.BorderSizePixel = 0
             local stripeCorner = Instance.new('UICorner')
@@ -23364,12 +23373,12 @@ run(function()
         if config.isTeamGen then
             local tierLabel = Instance.new('TextLabel')
             tierLabel.Name = 'Tier'
-            tierLabel.Size = UDim2.new(0, 25, 1, 0)
-            tierLabel.Position = UDim2.new(0, 8, 0, 0)
+            tierLabel.Size = scaledPos(0, 25, 1, 0)
+            tierLabel.Position = scaledPos(0, 8, 0, 0)
             tierLabel.BackgroundTransparency = 1
             tierLabel.Text = "0"
             tierLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
-            tierLabel.TextSize = 16
+            tierLabel.TextSize = scaledText(16)
             tierLabel.Font = Enum.Font.GothamBold
             tierLabel.TextStrokeTransparency = 0.5
             tierLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
@@ -23386,8 +23395,8 @@ run(function()
                 local iconImage = getProperIcon(resource.icon)
                 if iconImage then
                     local image = Instance.new('ImageLabel')
-                    image.Size = UDim2.fromOffset(18, 18)
-                    image.Position = UDim2.new(0, resource.xOffset, 0.5, 0)
+                    image.Size = scaledOffset(18, 18)
+                    image.Position = scaledPos(0, resource.xOffset, 0.5, 0)
                     image.AnchorPoint = Vector2.new(0, 0.5)
                     image.BackgroundTransparency = 1
                     image.Image = iconImage
@@ -23395,12 +23404,12 @@ run(function()
                 end
                 local countLabel = Instance.new('TextLabel')
                 countLabel.Name = resource.name .. '_count'
-                countLabel.Size = UDim2.new(0, 25, 1, 0)
-                countLabel.Position = UDim2.new(0, resource.xOffset + 20, 0, 0)
+                countLabel.Size = scaledPos(0, 25, 1, 0)
+                countLabel.Position = scaledPos(0, resource.xOffset + 20, 0, 0)
                 countLabel.BackgroundTransparency = 1
                 countLabel.Text = "0"
                 countLabel.TextColor3 = resource.color
-                countLabel.TextSize = 16
+                countLabel.TextSize = scaledText(16)
                 countLabel.Font = Enum.Font.GothamBold
                 countLabel.TextStrokeTransparency = 0.5
                 countLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
@@ -23421,15 +23430,14 @@ run(function()
                 isTeamGen = true,
                 baseWidth = baseWidth,
                 baseHeight = baseHeight,
-                baseOffset = baseOffset,
-                uiScale = billboardUIScale
+                baseOffset = baseOffset
             }
         else
             local iconImage = getProperIcon(config.icon)
             if iconImage then
                 local image = Instance.new('ImageLabel')
-                image.Size = UDim2.fromOffset(20, 20)
-                image.Position = UDim2.new(0, 5, 0.5, 0)
+                image.Size = scaledOffset(20, 20)
+                image.Position = scaledPos(0, 5, 0.5, 0)
                 image.AnchorPoint = Vector2.new(0, 0.5)
                 image.BackgroundTransparency = 1
                 image.Image = iconImage
@@ -23437,25 +23445,25 @@ run(function()
             end
             local timerLabel = Instance.new('TextLabel')
             timerLabel.Name = 'Timer'
-            timerLabel.Size = UDim2.new(0, 30, 1, 0)
-            timerLabel.Position = UDim2.new(0.5, 0, 0, 0)
+            timerLabel.Size = scaledPos(0, 30, 1, 0)
+            timerLabel.Position = scaledPos(0.5, 0, 0, 0)
             timerLabel.AnchorPoint = Vector2.new(0.5, 0)
             timerLabel.BackgroundTransparency = 1
             timerLabel.Text = "00"
             timerLabel.TextColor3 = displayColor
-            timerLabel.TextSize = 18
+            timerLabel.TextSize = scaledText(18)
             timerLabel.Font = Enum.Font.GothamBold
             timerLabel.TextStrokeTransparency = 0.5
             timerLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
             timerLabel.Parent = frame
             local amountLabel = Instance.new('TextLabel')
             amountLabel.Name = 'Amount'
-            amountLabel.Size = UDim2.new(0, 20, 1, 0)
-            amountLabel.Position = UDim2.new(1, -20, 0, 0)
+            amountLabel.Size = scaledPos(0, 20, 1, 0)
+            amountLabel.Position = scaledPos(1, -20, 0, 0)
             amountLabel.BackgroundTransparency = 1
             amountLabel.Text = "0"
             amountLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-            amountLabel.TextSize = 16
+            amountLabel.TextSize = scaledText(16)
             amountLabel.Font = Enum.Font.GothamBold
             amountLabel.TextStrokeTransparency = 0.5
             amountLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
@@ -23470,8 +23478,7 @@ run(function()
                 isTeamGen = false,
                 baseWidth = baseWidth,
                 baseHeight = baseHeight,
-                baseOffset = baseOffset,
-                uiScale = billboardUIScale
+                baseOffset = baseOffset
             }
         end
     end
@@ -23631,17 +23638,11 @@ run(function()
         Visible = true,
         Function = function(val)
             compactUIScale.Scale = val
-            for _, ref in pairs(Reference) do
-                if ref.billboard and ref.baseWidth and ref.baseHeight then
-                    ref.billboard.Size = UDim2.fromOffset(ref.baseWidth * val, ref.baseHeight * val)
-                    ref.billboard.StudsOffsetWorldSpace = ref.baseOffset * val
-                    if ref.uiScale then
-                        ref.uiScale.Scale = val
-                    end
-                end
+            if GeneratorESP and GeneratorESP.Enabled then
+                refreshESP()
             end
         end,
-        Tooltip = 'Changes the size of both original ESP and compact UI'
+        Tooltip = 'Changes the size of original billboard ESP and compact UI'
     })
 
     DiamondToggle = GeneratorESP:CreateToggle({
