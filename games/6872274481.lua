@@ -22871,14 +22871,14 @@ run(function()
 end)
 
 run(function()
-      local GeneratorESP
+   local GeneratorESP
     DiamondToggle = nil
     EmeraldToggle = nil
     TeamGenToggle = nil
     ShowOwnTeamGen = nil
     ShowEnemyTeamGen = nil
     local UIStyle
-    local CompactScaleSlider
+    local UIScaleSlider
     local CompactDiamondToggle
     local CompactEmeraldToggle
     local CollectionService = collectionService
@@ -22934,6 +22934,10 @@ run(function()
     compactUIScale.Name = 'CompactUIScale'
     compactUIScale.Scale = 1
     compactUIScale.Parent = mainFrame
+
+    local function getUIScaleValue()
+        return UIScaleSlider and UIScaleSlider.Value or 1
+    end
 
     local uicorner = Instance.new('UICorner')
     uicorner.CornerRadius = UDim.new(0, 8)
@@ -23289,13 +23293,13 @@ run(function()
         billboard.ClipsDescendants = false
         billboard.Adornee = generatorAdornee
 
-        if config.isTeamGen then
-            billboard.Size = UDim2.fromOffset(180, 55)
-            billboard.StudsOffsetWorldSpace = Vector3.new(0, 5, 0)
-        else
-            billboard.Size = UDim2.fromOffset(80, 30)
-            billboard.StudsOffsetWorldSpace = Vector3.new(0, 4, 0)
-        end
+        local uiScaleValue = getUIScaleValue()
+        local baseWidth = config.isTeamGen and 180 or 80
+        local baseHeight = config.isTeamGen and 55 or 30
+        local baseOffset = config.isTeamGen and Vector3.new(0, 5, 0) or Vector3.new(0, 4, 0)
+
+        billboard.Size = UDim2.fromOffset(baseWidth * uiScaleValue, baseHeight * uiScaleValue)
+        billboard.StudsOffsetWorldSpace = baseOffset * uiScaleValue
 
         local blur = addBlur(billboard)
         blur.Visible = true
@@ -23334,6 +23338,11 @@ run(function()
         frame.BackgroundTransparency = 0.3
         frame.BorderSizePixel = 0
         frame.Parent = billboard
+
+        local billboardUIScale = Instance.new('UIScale')
+        billboardUIScale.Name = 'GeneratorESPScale'
+        billboardUIScale.Scale = uiScaleValue
+        billboardUIScale.Parent = frame
 
         if config.isTeamGen and teamId and teamColors[teamId] then
             local stripe = Instance.new('Frame')
@@ -23409,7 +23418,11 @@ run(function()
                 genType = genType,
                 position = position,
                 teamId = teamId,
-                isTeamGen = true
+                isTeamGen = true,
+                baseWidth = baseWidth,
+                baseHeight = baseHeight,
+                baseOffset = baseOffset,
+                uiScale = billboardUIScale
             }
         else
             local iconImage = getProperIcon(config.icon)
@@ -23454,7 +23467,11 @@ run(function()
                 genType = genType,
                 position = position,
                 teamId = teamId,
-                isTeamGen = false
+                isTeamGen = false,
+                baseWidth = baseWidth,
+                baseHeight = baseHeight,
+                baseOffset = baseOffset,
+                uiScale = billboardUIScale
             }
         end
     end
@@ -23600,23 +23617,31 @@ run(function()
             if ShowEnemyTeamGen then ShowEnemyTeamGen.Object.Visible = isOriginal and TeamGenToggle.Enabled end
             if CompactDiamondToggle then CompactDiamondToggle.Object.Visible = not isOriginal end
             if CompactEmeraldToggle then CompactEmeraldToggle.Object.Visible = not isOriginal end
-            if CompactScaleSlider then CompactScaleSlider.Object.Visible = not isOriginal end
             refreshESP()
         end,
         Tooltip = 'Choose between original billboard ESP or compact side UI'
     })
 
-    CompactScaleSlider = GeneratorESP:CreateSlider({
-        Name = 'Compact UI Scale',
+    UIScaleSlider = GeneratorESP:CreateSlider({
+        Name = 'UI Scale',
         Min = 0.5,
         Max = 2,
         Decimal = 100,
         Default = 1,
-        Visible = false,
+        Visible = true,
         Function = function(val)
             compactUIScale.Scale = val
+            for _, ref in pairs(Reference) do
+                if ref.billboard and ref.baseWidth and ref.baseHeight then
+                    ref.billboard.Size = UDim2.fromOffset(ref.baseWidth * val, ref.baseHeight * val)
+                    ref.billboard.StudsOffsetWorldSpace = ref.baseOffset * val
+                    if ref.uiScale then
+                        ref.uiScale.Scale = val
+                    end
+                end
+            end
         end,
-        Tooltip = 'Changes the size of the compact generator UI'
+        Tooltip = 'Changes the size of both original ESP and compact UI'
     })
 
     DiamondToggle = GeneratorESP:CreateToggle({
@@ -23675,7 +23700,6 @@ run(function()
         Visible = true
     })
 end)
-
 run(function()
     local Gingerbread
     local LimitToItem
