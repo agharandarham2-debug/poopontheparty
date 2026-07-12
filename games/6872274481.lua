@@ -8353,640 +8353,109 @@ run(function()
 end)
 	
 run(function()
-	local KitESP
-	local Notify
-	local Background
-	local Color = {}
-	local Reference = {}
-	local Folder = Instance.new('Folder')
-	Folder.Parent = vape.gui
-	
-	local ESPKits = {
-		alchemist = {'alchemist_ingedients', 'thorns'},
-		beekeeper = {'bee', 'bee'},
-		bigman = {'treeOrb', 'natures_essence_1'},
-		ghost_catcher = {'ghost', 'ghost_orb'},
-		metal_detector = {'hidden-metal', 'iron'},
-		sheep_herder = {'SheepModel', 'purple_hay_bale'},
-		sorcerer = {'alchemy_crystal', 'wild_flower'},
-		star_collector = {'stars', 'crit_star'},
-		black_market_trader = {'shadow_coin', 'shadow_coin'},
-		miner = {'petrified-player', 'large_rock'},
-		trapper = {'snap_trap', 'snap_trap'},
-		mage = {'ElementTome', 'mage_spellbook'},
-	}
-	local NONTaggedKits = {
-		necromancer = {'Gravestone', true},
-		battery = {'Open', true},
-	}
-	local DescendantKits = {
-		['farmer_cletus'] = {
-			{'carrot', 'carrot_seeds'},
-			{'melon', 'melon_seeds'},
-			{'pumpkin', 'pumpkin_seeds'},
-		},
-	}
+    local KitESP
+    local Background
+    local Color = {}
+    local Reference = {}
+    local Folder = Instance.new('Folder')
+    Folder.Parent = vape.gui
 
-	local function getAlchemistImage(v)
-		local name = v and v.Name or ''
-		if name == 'Mushrooms' then
-			return bedwars.getIcon({itemType = 'mushrooms'}, true)
-		elseif name == 'Thorns' then
-			return bedwars.getIcon({itemType = 'thorns'}, true)
-		else
-			return bedwars.getIcon({itemType = 'wild_flower'}, true)
-		end
-	end
+    local ESPKits = {
+    	alchemist = {'alchemist_ingedients', 'wild_flower'},
+    	beekeeper = {'bee', 'bee'},
+    	bigman = {'treeOrb', 'natures_essence_1'},
+    	ghost_catcher = {'ghost', 'ghost_orb'},
+    	metal_detector = {'hidden-metal', 'iron'},
+    	sheep_herder = {'SheepModel', 'purple_hay_bale'},
+    	sorcerer = {'alchemy_crystal', 'wild_flower'},
+    	star_collector = {'stars', 'crit_star'},
+    }
 
-	local function getStarImage(v)
-		local parent = v and v.Parent
-		if parent and parent:IsA("Model") then
-			local modelName = parent.Name
-			if modelName == "CritStar" or modelName:lower():find("crit") then
-				return bedwars.getIcon({itemType = 'crit_star'}, true)
-			elseif modelName == "VitalityStar" or modelName:lower():find("vitality") then
-				return bedwars.getIcon({itemType = 'vitality_star'}, true)
-			end
-		end
-		return bedwars.getIcon({itemType = 'crit_star'}, true)
-	end
+    local function Added(v, icon, tag)
+    	if tag == 'bee' and math.abs(v.Parent:GetAttribute('BeeId') or 0) < 100 then return end
+    	local billboard = Instance.new('BillboardGui')
+    	billboard.Parent = Folder
+    	billboard.Name = icon
+    	billboard.StudsOffsetWorldSpace = Vector3.new(0, 3, 0)
+    	billboard.Size = UDim2.fromOffset(36, 36)
+    	billboard.AlwaysOnTop = true
+    	billboard.ClipsDescendants = false
+    	billboard.Adornee = v
+    	local blur = addBlur(billboard)
+    	blur.Visible = Background.Enabled
+    	local image = Instance.new('ImageLabel')
+    	image.Size = UDim2.fromOffset(36, 36)
+    	image.Position = UDim2.fromScale(0.5, 0.5)
+    	image.AnchorPoint = Vector2.new(0.5, 0.5)
+    	image.BackgroundColor3 = Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
+    	image.BackgroundTransparency = 1 - (Background.Enabled and Color.Opacity or 0)
+    	image.BorderSizePixel = 0
+    	image.Image = bedwars.getIcon({ itemType = icon }, true)
+    	image.Parent = billboard
+    	local uicorner = Instance.new('UICorner')
+    	uicorner.CornerRadius = UDim.new(0, 4)
+    	uicorner.Parent = image
+    	Reference[v] = billboard
+    end
 
-	local function Added(v, icon, non)
-		if Reference[v] then return end
-		if Notify.Enabled then
-			vape:CreateNotification("KitESP", `New object is added {v.Name}`, 2)
-		end
-		local billboard = Instance.new('BillboardGui')
-		billboard.Parent = Folder
-		billboard.Name = icon
-		billboard.StudsOffsetWorldSpace = Vector3.new(0, 3, 0)
-		billboard.Size = UDim2.fromOffset(36, 36)
-		billboard.AlwaysOnTop = true
-		billboard.ClipsDescendants = false
-		billboard.Adornee = v
-		local blur = addBlur(billboard)
-		blur.Visible = Background.Enabled
-		local image = Instance.new('ImageLabel')
-		image.Size = UDim2.fromOffset(36, 36)
-		image.Position = UDim2.fromScale(0.5, 0.5)
-		image.AnchorPoint = Vector2.new(0.5, 0.5)
-		image.BackgroundColor3 = Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
-		image.BackgroundTransparency = 1 - (Background.Enabled and Color.Opacity or 0)
-		image.BorderSizePixel = 0
-		if non then
-			image.Image = icon
-		else
-			image.Image = bedwars.getIcon({itemType = icon}, true)
-		end
-		image.Parent = billboard
-		local uicorner = Instance.new('UICorner')
-		uicorner.CornerRadius = UDim.new(0, 4)
-		uicorner.Parent = image
-		Reference[v] = billboard
-	end
+    local function addKit(tag, icon)
+    	KitESP:Clean(collectionService:GetInstanceAddedSignal(tag):Connect(function(v)
+    		Added(v.PrimaryPart, icon, tag)
+    	end))
+    	KitESP:Clean(collectionService:GetInstanceRemovedSignal(tag):Connect(function(v)
+    		if Reference[v.PrimaryPart] then
+    			Reference[v.PrimaryPart]:Destroy()
+    			Reference[v.PrimaryPart] = nil
+    		end
+    	end))
+    	for _, v in collectionService:GetTagged(tag) do
+    		Added(v.PrimaryPart, icon, tag)
+    	end
+    end
 
-	local function AddedStar(v)
-		if not v or not v.Parent then return end
-		if Reference[v] then return end
-
-		if Notify.Enabled then
-			vape:CreateNotification("KitESP", `New object is added {v.Name}`, 2)
-		end
-		local billboard = Instance.new('BillboardGui')
-		billboard.Parent = Folder
-		billboard.Name = 'star'
-		billboard.StudsOffsetWorldSpace = Vector3.new(0, 3, 0)
-		billboard.Size = UDim2.fromOffset(36, 36)
-		billboard.AlwaysOnTop = true
-		billboard.ClipsDescendants = false
-		billboard.Adornee = v
-		local blur = addBlur(billboard)
-		blur.Visible = Background.Enabled
-		local image = Instance.new('ImageLabel')
-		image.Size = UDim2.fromOffset(36, 36)
-		image.Position = UDim2.fromScale(0.5, 0.5)
-		image.AnchorPoint = Vector2.new(0.5, 0.5)
-		image.BackgroundColor3 = Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
-		image.BackgroundTransparency = 1 - (Background.Enabled and Color.Opacity or 0)
-		image.BorderSizePixel = 0
-		image.Image = getStarImage(v)
-		image.Parent = billboard
-		local uicorner = Instance.new('UICorner')
-		uicorner.CornerRadius = UDim.new(0, 4)
-		uicorner.Parent = image
-		Reference[v] = billboard
-	end
-	
-	local currentConnections = {}
-	local currentKit = nil
-
-	local function disconnectAll()
-		for _, conn in ipairs(currentConnections) do
-			conn:Disconnect()
-		end
-		table.clear(currentConnections)
-	end
-
-	local function addKit(tag, icon)
-		if tag == 'alchemist_ingedients' then
-			local connAdded = collectionService:GetInstanceAddedSignal(tag):Connect(function(v)
-				if v.PrimaryPart then
-					task.wait(0.1)
-					if Reference[v.PrimaryPart] then return end
-					local billboard = Instance.new('BillboardGui')
-					billboard.Parent = Folder
-					billboard.StudsOffsetWorldSpace = Vector3.new(0, 3, 0)
-					billboard.Size = UDim2.fromOffset(36, 36)
-					billboard.AlwaysOnTop = true
-					billboard.ClipsDescendants = false
-					billboard.Adornee = v.PrimaryPart
-					local blur = addBlur(billboard)
-					blur.Visible = Background.Enabled
-					local image = Instance.new('ImageLabel')
-					image.Size = UDim2.fromOffset(36, 36)
-					image.Position = UDim2.fromScale(0.5, 0.5)
-					image.AnchorPoint = Vector2.new(0.5, 0.5)
-					image.BackgroundColor3 = Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
-					image.BackgroundTransparency = 1 - (Background.Enabled and Color.Opacity or 0)
-					image.BorderSizePixel = 0
-					image.Image = getAlchemistImage(v)
-					image.Parent = billboard
-					local uicorner = Instance.new('UICorner')
-					uicorner.CornerRadius = UDim.new(0, 4)
-					uicorner.Parent = image
-					Reference[v.PrimaryPart] = billboard
-				end
-			end)
-			table.insert(currentConnections, connAdded)
-			local connRemoved = collectionService:GetInstanceRemovedSignal(tag):Connect(function(v)
-				if v.PrimaryPart and Reference[v.PrimaryPart] then
-					Reference[v.PrimaryPart]:Destroy()
-					Reference[v.PrimaryPart] = nil
-				end
-			end)
-			table.insert(currentConnections, connRemoved)
-			for _, v in collectionService:GetTagged(tag) do
-				if v.PrimaryPart and not Reference[v.PrimaryPart] then
-					local billboard = Instance.new('BillboardGui')
-					billboard.Parent = Folder
-					billboard.StudsOffsetWorldSpace = Vector3.new(0, 3, 0)
-					billboard.Size = UDim2.fromOffset(36, 36)
-					billboard.AlwaysOnTop = true
-					billboard.ClipsDescendants = false
-					billboard.Adornee = v.PrimaryPart
-					local blur = addBlur(billboard)
-					blur.Visible = Background.Enabled
-					local image = Instance.new('ImageLabel')
-					image.Size = UDim2.fromOffset(36, 36)
-					image.Position = UDim2.fromScale(0.5, 0.5)
-					image.AnchorPoint = Vector2.new(0.5, 0.5)
-					image.BackgroundColor3 = Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
-					image.BackgroundTransparency = 1 - (Background.Enabled and Color.Opacity or 0)
-					image.BorderSizePixel = 0
-					image.Image = getAlchemistImage(v)
-					image.Parent = billboard
-					local uicorner = Instance.new('UICorner')
-					uicorner.CornerRadius = UDim.new(0, 4)
-					uicorner.Parent = image
-					Reference[v.PrimaryPart] = billboard
-				end
-			end
-			return
-		end
-		if tag == 'stars' then
-			local connAdded = collectionService:GetInstanceAddedSignal(tag):Connect(function(v)
-				if v:IsA("Model") and v.PrimaryPart then
-					task.wait(0.1)
-					AddedStar(v.PrimaryPart)
-				end
-			end)
-			table.insert(currentConnections, connAdded)
-			local connRemoved = collectionService:GetInstanceRemovedSignal(tag):Connect(function(v)
-				if v.PrimaryPart and Reference[v.PrimaryPart] then
-					Reference[v.PrimaryPart]:Destroy()
-					Reference[v.PrimaryPart] = nil
-				end
-			end)
-			table.insert(currentConnections, connRemoved)
-			for _, v in collectionService:GetTagged(tag) do
-				if v:IsA("Model") and v.PrimaryPart then
-					AddedStar(v.PrimaryPart)
-				end
-			end
-			return
-		end
-
-		local connAdded = collectionService:GetInstanceAddedSignal(tag):Connect(function(v)
-			if tag == 'bee' and (v.Name:find('TamedBee') or v:FindFirstChild('TamedBee')) then return end
-			Added(v.PrimaryPart, icon, false)
-		end)
-		table.insert(currentConnections, connAdded)
-		local connRemoved = collectionService:GetInstanceRemovedSignal(tag):Connect(function(v)
-			if Reference[v.PrimaryPart] then
-				Reference[v.PrimaryPart]:Destroy()
-				Reference[v.PrimaryPart] = nil
-			end
-		end)
-		table.insert(currentConnections, connRemoved)
-		for _, v in collectionService:GetTagged(tag) do
-			if tag == 'bee' and (v.Name:find('TamedBee') or v:FindFirstChild('TamedBee')) then continue end
-			Added(v.PrimaryPart, icon, false)
-		end
-	end
-
-	local function addKitNon(objName, icon)
-		if typeof(icon) == "boolean" then
-			if objName == "Gravestone" then
-				icon = "rbxassetid://6307844310"
-			elseif objName == "Open" then
-				icon = "rbxassetid://10159166528"
-			else
-				icon = bedwars.getIcon({itemType = icon}, true) or ''
-			end
-		else
-			icon = bedwars.getIcon({itemType = icon}, true)
-		end
-		local connAdded = workspace.ChildAdded:Connect(function(child)
-			if child:IsA("Model") and child.Name == objName then
-				task.wait(0.1)
-				if child.PrimaryPart then
-					Added(child, icon, true)
-				end
-			end
-		end)
-		table.insert(currentConnections, connAdded)
-		local connRemoved = workspace.ChildRemoved:Connect(function(child)
-			if child:IsA("Model") and child.Name == objName then
-				if Reference[child] then
-					Reference[child]:Destroy()
-					Reference[child] = nil
-				end
-			end
-		end)
-		table.insert(currentConnections, connRemoved)
-	end
-
-	local function addKitDescendant(partName, icon)
-		local resolvedIcon = bedwars.getIcon({itemType = icon}, true)
-		
-		local function shouldSkip(obj)
-			local p = obj.Parent
-			while p and p ~= workspace do
-				if p.Name == partName then return true end
-				p = p.Parent
-			end
-			return false
-		end
-
-		for _, obj in workspace:GetDescendants() do
-			if obj:IsA("BasePart") and obj.Name == partName and not shouldSkip(obj) then
-				if not Reference[obj] then
-					Added(obj, resolvedIcon, true)
-				end
-			end
-		end
-		local connAdded = workspace.DescendantAdded:Connect(function(obj)
-			if obj:IsA("BasePart") and obj.Name == partName and not shouldSkip(obj) then
-				task.wait(0.1)
-				if not Reference[obj] then
-					Added(obj, resolvedIcon, true)
-				end
-			end
-		end)
-		table.insert(currentConnections, connAdded)
-		local connRemoved = workspace.DescendantRemoving:Connect(function(obj)
-			if obj:IsA("BasePart") and obj.Name == partName and Reference[obj] then
-				Reference[obj]:Destroy()
-				Reference[obj] = nil
-			end
-		end)
-		table.insert(currentConnections, connRemoved)
-	end
-
-	local function setupKit(kitName)
-		local kit = ESPKits[kitName]
-		local nontag = NONTaggedKits[kitName]
-		local desctag = DescendantKits[kitName]
-		if kit then
-			addKit(kit[1], kit[2])
-		end
-		if nontag then
-			addKitNon(nontag[1], nontag[2])
-		end
-		if desctag then
-			for _, entry in ipairs(desctag) do
-				addKitDescendant(entry[1], entry[2])
-			end
-		end
-	end
-
-	KitESP = vape.Categories.Kits:CreateModule({
-		Name = 'KitESP',
-		Function = function(callback)
-			if callback then
-				task.spawn(function()
-					while KitESP.Enabled do
-						if not currentKit then
-							repeat
-								task.wait()
-							until store.equippedKit ~= '' or not KitESP.Enabled
-							if not KitESP.Enabled then break end
-						end
-						local newKit = store.equippedKit
-						if newKit ~= currentKit then
-							disconnectAll()
-							Folder:ClearAllChildren()
-							table.clear(Reference)
-							if newKit ~= '' then
-								setupKit(newKit)
-							end
-							currentKit = newKit
-						end
-						task.wait(1)
-					end
-					disconnectAll()
-					Folder:ClearAllChildren()
-					table.clear(Reference)
-					currentKit = nil
-				end)
-			else
-				disconnectAll()
-				Folder:ClearAllChildren()
-				table.clear(Reference)
-				currentKit = nil
-			end
-		end,
-		Tooltip = 'ESP for certain kit related objects'
-	})
-	Notify = KitESP:CreateToggle({
-		Name = "Notify",
-		Default = false
-	})
-	Background = KitESP:CreateToggle({
-		Name = 'Background',
-		Function = function(callback)
-			if Color.Object then Color.Object.Visible = callback end
-			for _, v in Reference do
-				v.ImageLabel.BackgroundTransparency = 1 - (callback and Color.Opacity or 0)
-				v.Blur.Visible = callback
-			end
-		end,
-		Default = true
-	})
-    Color = KitESP:CreateColorSlider({
-        Name = 'Background Color',
-        DefaultValue = 0,
-        DefaultOpacity = 0.5,
-        Function = function(hue, sat, val, opacity)
-            for _, v in Reference do
-                v.ImageLabel.BackgroundColor3 = Color3.fromHSV(hue, sat, val)
-                v.ImageLabel.BackgroundTransparency = 1 - opacity
-            end
-        end,
-        Darker = true
+    KitESP = vape.Categories.Render:CreateModule({
+    	Name = 'Kit ESP',
+    	Function = function(callback)
+    		if callback then
+    			repeat
+    				task.wait()
+    			until store.equippedKit ~= '' or not KitESP.Enabled
+    			local kit = KitESP.Enabled and ESPKits[store.equippedKit] or nil
+    			if kit then
+    				addKit(kit[1], kit[2])
+    			end
+    		else
+    			Folder:ClearAllChildren()
+    			table.clear(Reference)
+    		end
+    	end,
+    	Tooltip = 'ESP for certain kit related objects'
     })
-
-    task.defer(function()
-        if Color and Color.Object then
-            Color.Object.Visible = Background.Enabled  
-        end
-    end)
-end)
-
-run(function()
-	local LootESP
-	local IronToggle
-	local DiamondToggle
-	local EmeraldToggle
-	local Reference = {}
-	local Folder = Instance.new('Folder')
-	Folder.Parent = vape.gui
-	
-	local CollectionService = collectionService
-	
-	local lootTypes = {
-		iron = {
-			keywords = {'iron'},
-			color = Color3.fromRGB(200, 200, 200),
-			icon = 'iron',
-			displayName = 'IRON'
-		},
-		diamond = {
-			keywords = {'diamond'},
-			color = Color3.fromRGB(85, 200, 255),
-			icon = 'diamond',
-			displayName = 'DIAMOND'
-		},
-		emerald = {
-			keywords = {'emerald'},
-			color = Color3.fromRGB(0, 255, 100),
-			icon = 'emerald',
-			displayName = 'EMERALD'
-		}
-	}
-	
-	local function getLootType(itemName)
-		local nameLower = itemName:lower()
-		for lootType, config in pairs(lootTypes) do
-			for _, keyword in ipairs(config.keywords) do
-				if nameLower:find(keyword, 1, true) then 
-					return lootType, config
-				end
-			end
-		end
-		return nil
-	end
-	
-	local function isLootEnabled(lootType)
-		if lootType == 'iron' then
-			return IronToggle.Enabled
-		elseif lootType == 'diamond' then
-			return DiamondToggle.Enabled
-		elseif lootType == 'emerald' then
-			return EmeraldToggle.Enabled
-		end
-		return false
-	end
-	
-	local function getProperIcon(lootType)
-		local icon = bedwars.getIcon({itemType = lootType}, true)
-		
-		if not icon or icon == "" then
-			return nil
-		end
-		
-		return icon
-	end
-	
-	local function Added(lootHandle, lootType, config)
-		if not isLootEnabled(lootType) then return end
-		if Reference[lootHandle] then return end 
-		
-		local billboard = Instance.new('BillboardGui')
-		billboard.Parent = Folder
-		billboard.Name = lootType
-		billboard.StudsOffsetWorldSpace = Vector3.new(0, 3, 0)
-		billboard.Size = UDim2.fromOffset(40, 40)
-		billboard.AlwaysOnTop = true
-		billboard.ClipsDescendants = false
-		billboard.Adornee = lootHandle
-		
-		local blur = addBlur(billboard)
-		blur.Visible = true 
-		
-		local iconImage = getProperIcon(config.icon)
-		
-		if iconImage then
-			local image = Instance.new('ImageLabel')
-			image.Size = UDim2.fromOffset(40, 40)
-			image.Position = UDim2.fromScale(0.5, 0.5)
-			image.AnchorPoint = Vector2.new(0.5, 0.5)
-			image.BackgroundColor3 = Color3.new(0, 0, 0) 
-			image.BackgroundTransparency = 0.3 
-			image.BorderSizePixel = 0
-			image.Image = iconImage
-			image.Parent = billboard
-			
-			local uicorner = Instance.new('UICorner')
-			uicorner.CornerRadius = UDim.new(0, 4)
-			uicorner.Parent = image
-		else
-			local frame = Instance.new('Frame')
-			frame.Size = UDim2.fromScale(1, 1)
-			frame.BackgroundColor3 = Color3.new(0, 0, 0) 
-			frame.BackgroundTransparency = 0.3 
-			frame.BorderSizePixel = 0
-			frame.Parent = billboard
-			
-			local uicorner = Instance.new('UICorner')
-			uicorner.CornerRadius = UDim.new(0, 4)
-			uicorner.Parent = frame
-			
-			local textLabel = Instance.new('TextLabel')
-			textLabel.Size = UDim2.fromScale(1, 1)
-			textLabel.Position = UDim2.fromScale(0.5, 0.5)
-			textLabel.AnchorPoint = Vector2.new(0.5, 0.5)
-			textLabel.BackgroundTransparency = 1
-			textLabel.Text = config.displayName
-			textLabel.TextColor3 = config.color
-			textLabel.TextScaled = true
-			textLabel.Font = Enum.Font.GothamBold
-			textLabel.TextStrokeTransparency = 0.5
-			textLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
-			textLabel.Parent = frame
-		end
-		
-		Reference[lootHandle] = billboard
-	end
-	
-	local function Removed(lootHandle)
-		if Reference[lootHandle] then
-			Reference[lootHandle]:Destroy()
-			Reference[lootHandle] = nil
-		end
-	end
-	
-	local function findExistingLoot()
-		local tagged = CollectionService:GetTagged('ItemDrop')
-		for _, drop in ipairs(tagged) do
-			local handle = drop:FindFirstChild('Handle')
-			if handle then
-				local lootType, config = getLootType(drop.Name)
-				if lootType and isLootEnabled(lootType) then
-					if not Reference[handle] then
-						Added(handle, lootType, config)
-					end
-				end
-			end
-		end
-	end
-	
-	local function refreshLootType(lootType)
-		if not LootESP.Enabled then return end
-		
-		local enabled = isLootEnabled(lootType)
-		
-		if not enabled then
-			for handle, billboard in pairs(Reference) do
-				if billboard.Name == lootType then
-					billboard:Destroy()
-					Reference[handle] = nil
-				end
-			end
-		else
-			local tagged = CollectionService:GetTagged('ItemDrop')
-			for _, drop in ipairs(tagged) do
-				local handle = drop:FindFirstChild('Handle')
-				if handle then
-					local dropLootType, config = getLootType(drop.Name)
-					if dropLootType == lootType and not Reference[handle] then
-						Added(handle, lootType, config)
-					end
-				end
-			end
-		end
-	end
-	
-	LootESP = vape.Categories.Render:CreateModule({
-		Name = 'LootESP',
-		Function = function(callback)
-			if callback then
-				findExistingLoot()
-				
-				LootESP:Clean(CollectionService:GetInstanceAddedSignal('ItemDrop'):Connect(function(drop)
-					if not LootESP.Enabled then return end
-					
-					task.defer(function()
-						local handle = drop:FindFirstChild('Handle')
-						if not handle then return end
-						
-						local lootType, config = getLootType(drop.Name)
-						if lootType and isLootEnabled(lootType) then
-							Added(handle, lootType, config)
-						end
-					end)
-				end))
-				
-				LootESP:Clean(CollectionService:GetInstanceRemovedSignal('ItemDrop'):Connect(function(drop)
-					local handle = drop:FindFirstChild('Handle')
-					if handle then
-						Removed(handle)
-					end
-				end))
-				
-			else
-				for handle, billboard in pairs(Reference) do
-					billboard:Destroy()
-				end
-				table.clear(Reference)
-			end
-		end,
-		Tooltip = 'ESP for loot drops (iron, diamond, emerald)'
-	})
-	
-	IronToggle = LootESP:CreateToggle({
-		Name = 'Iron',
-		Function = function(callback)
-			refreshLootType('iron')
-		end,
-		Default = true
-	})
-	
-	DiamondToggle = LootESP:CreateToggle({
-		Name = 'Diamond',
-		Function = function(callback)
-			refreshLootType('diamond')
-		end,
-		Default = true
-	})
-	
-	EmeraldToggle = LootESP:CreateToggle({
-		Name = 'Emerald',
-		Function = function(callback)
-			refreshLootType('emerald')
-		end,
-		Default = true
-	})
+    Background = KitESP:CreateToggle({
+    	Name = 'Background',
+    	Function = function(callback)
+    		if Color.Object then
+    			Color.Object.Visible = callback
+    		end
+    		for _, v in Reference do
+    			v.ImageLabel.BackgroundTransparency = 1 - (callback and Color.Opacity or 0)
+    			v.Blur.Visible = callback
+    		end
+    	end,
+    	Default = true,
+    })
+    Color = KitESP:CreateColorSlider({
+    	Name = 'Background Color',
+    	DefaultValue = 0,
+    	DefaultOpacity = 0.5,
+    	Function = function(hue, sat, val, opacity)
+    		for _, v in Reference do
+    			v.ImageLabel.BackgroundColor3 = Color3.fromHSV(hue, sat, val)
+    			v.ImageLabel.BackgroundTransparency = 1 - opacity
+    		end
+    	end,
+    	Darker = true,
+    })
 end)
 
 run(function()
