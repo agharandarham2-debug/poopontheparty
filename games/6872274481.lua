@@ -8372,7 +8372,17 @@ run(function()
     }
 
     local function Added(v, icon, tag)
-    	if tag == 'bee' and math.abs(v.Parent:GetAttribute('BeeId') or 0) < 100 then return end
+    	if not v or not v.Parent then
+    return
+end
+
+if tag == "bee" then
+    local beeId = v.Parent:GetAttribute("BeeId") or 0
+
+    if math.abs(beeId) < 100 then
+        return
+    end
+end
     	local billboard = Instance.new('BillboardGui')
     	billboard.Parent = Folder
     	billboard.Name = icon
