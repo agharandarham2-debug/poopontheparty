@@ -8411,7 +8411,18 @@ run(function()
 		return bedwars.getIcon({itemType = 'crit_star'}, true)
 	end
 
-	local function Added(v, icon, non)
+	local function shouldAddBee(part)
+		if not part or not part.Parent then
+			return false
+		end
+
+		local beeId = part.Parent:GetAttribute('BeeId') or 0
+		return math.abs(beeId) >= 100
+	end
+
+	local function Added(v, icon, non, tag)
+		if not v then return end
+		if tag == 'bee' and not shouldAddBee(v) then return end
 		if Reference[v] then return end
 		if Notify.Enabled then
 			vape:CreateNotification("KitESP", `New object is added {v.Name}`, 2)
@@ -8577,20 +8588,25 @@ run(function()
 		end
 
 		local connAdded = collectionService:GetInstanceAddedSignal(tag):Connect(function(v)
+			local primaryPart = v and v.PrimaryPart
+			if not primaryPart then return end
 			if tag == 'bee' and (v.Name:find('TamedBee') or v:FindFirstChild('TamedBee')) then return end
-			Added(v.PrimaryPart, icon, false)
+			Added(primaryPart, icon, false, tag)
 		end)
 		table.insert(currentConnections, connAdded)
 		local connRemoved = collectionService:GetInstanceRemovedSignal(tag):Connect(function(v)
-			if Reference[v.PrimaryPart] then
-				Reference[v.PrimaryPart]:Destroy()
-				Reference[v.PrimaryPart] = nil
+			local primaryPart = v and v.PrimaryPart
+			if primaryPart and Reference[primaryPart] then
+				Reference[primaryPart]:Destroy()
+				Reference[primaryPart] = nil
 			end
 		end)
 		table.insert(currentConnections, connRemoved)
 		for _, v in collectionService:GetTagged(tag) do
+			local primaryPart = v and v.PrimaryPart
+			if not primaryPart then continue end
 			if tag == 'bee' and (v.Name:find('TamedBee') or v:FindFirstChild('TamedBee')) then continue end
-			Added(v.PrimaryPart, icon, false)
+			Added(primaryPart, icon, false, tag)
 		end
 	end
 
@@ -8752,7 +8768,6 @@ run(function()
         end
     end)
 end)
-
 run(function()
     local NameTags
     local Targets
