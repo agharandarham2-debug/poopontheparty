@@ -3803,121 +3803,137 @@ run(function()
     local Time
     local BedCheck
     local Blacklist
+    local BlacklistTime
     local blocks
     local string_lower = string.lower
     local string_find = string.find
     local task_wait = task.wait
     local currentBlock = nil
     local oldHitBlock = nil
+    local lastHotbarSlot = nil
     local bedCache = {}
     local blacklistCache = {}
     local lastCacheClean = 0
-    local cacheCleanInterval = 5 
-    
+    local cacheCleanInterval = 5
+
     local function isBed(block)
         if not block then return false end
+
         local cached = bedCache[block]
         if cached ~= nil then return cached end
-        
+
         local result = false
         pcall(function()
-            if collectionService:HasTag(block, 'bed') or (block.Parent and collectionService:HasTag(block.Parent, 'bed')) then
+            if collectionService:HasTag(block, 'bed')
+                or (block.Parent and collectionService:HasTag(block.Parent, 'bed')) then
                 result = true
             elseif string_find(string_lower(block.Name), 'bed', 1, true) then
                 result = true
             end
         end)
-        
+
         bedCache[block] = result
         return result
     end
-    
+
     local cachedBlacklistLower = {}
+
     local function updateBlacklistCache()
         if not blocks or not blocks.ListEnabled then return end
-        
+
         cachedBlacklistLower = {}
-        for _, v in pairs(blocks.ListEnabled) do
-            table.insert(cachedBlacklistLower, string_lower(v))
+        for _, value in pairs(blocks.ListEnabled) do
+            table.insert(cachedBlacklistLower, string_lower(value))
         end
     end
-    
+
     local function isBlacklisted(block)
         if not block or #cachedBlacklistLower == 0 then return false end
+
         local cached = blacklistCache[block]
         if cached ~= nil then return cached end
-        
+
         local name = string_lower(block.Name)
         local result = false
+
         for i = 1, #cachedBlacklistLower do
             if string_find(name, cachedBlacklistLower[i], 1, true) then
                 result = true
                 break
             end
         end
-        
+
         blacklistCache[block] = result
         return result
     end
-    
-    local function shouldSkip(block)
-        if not block then return false end
-        if BedCheck and BedCheck.Enabled and isBed(block) then return true end
-        if Blacklist and Blacklist.Enabled and isBlacklisted(block) then return true end
-        return false
-    end
-    
+
     local lastBreakUpdate = 0
     local breakUpdateCooldown = 0.05
     local pendingUpdate = false
-    
+
     local function updateBreakSpeed()
         if not FastBreak or not FastBreak.Enabled then return end
+
         local now = tick()
         if now - lastBreakUpdate < breakUpdateCooldown then
             pendingUpdate = true
             return
         end
+
         lastBreakUpdate = now
         pendingUpdate = false
-        
+
         pcall(function()
-            local cooldown = (shouldSkip(currentBlock)) and 0.3 or Time.Value
+            local cooldown = Time.Value
+
+            if BedCheck and BedCheck.Enabled and isBed(currentBlock) then
+                cooldown = 0.3
+            elseif Blacklist and Blacklist.Enabled and isBlacklisted(currentBlock) then
+                cooldown = BlacklistTime.Value
+            end
+
             bedwars.BlockBreakController.blockBreaker:setCooldown(cooldown)
         end)
     end
-    
+
     FastBreak = vape.Categories.Blatant:CreateModule({
         Name = 'FastBreak',
         Function = function(callback)
             if callback then
                 oldHitBlock = bedwars.BlockBreaker.hitBlock
-				local lastHotbarSlot = nil
+                lastHotbarSlot = nil
 
-				bedwars.BlockBreaker.hitBlock = function(self, maid, raycastparams, ...)
-					local block = nil
-					pcall(function()
-						local blockInfo = self.clientManager:getBlockSelector():getMouseInfo(1, {ray = raycastparams})
-						if blockInfo and blockInfo.target and blockInfo.target.blockInstance then
-							block = blockInfo.target.blockInstance
-						end
-					end)
-					
-					local currentSlot = store.inventory and store.inventory.hotbarSlot
-					local slotChanged = currentSlot ~= lastHotbarSlot
-					if slotChanged then
-						lastHotbarSlot = currentSlot
-					end
+                bedwars.BlockBreaker.hitBlock = function(self, maid, raycastparams, ...)
+                    local block = nil
 
-					if block ~= currentBlock or slotChanged then
-						currentBlock = block
-						updateBreakSpeed()
-					end
-					return oldHitBlock and oldHitBlock(self, maid, raycastparams, ...)
-				end
-                
+                    pcall(function()
+                        local blockInfo = self.clientManager:getBlockSelector():getMouseInfo(1, {
+                            ray = raycastparams
+                        })
+
+                        if blockInfo and blockInfo.target and blockInfo.target.blockInstance then
+                            block = blockInfo.target.blockInstance
+                        end
+                    end)
+
+                    local currentSlot = store.inventory and store.inventory.hotbarSlot
+                    local slotChanged = currentSlot ~= lastHotbarSlot
+
+                    if slotChanged then
+                        lastHotbarSlot = currentSlot
+                    end
+
+                    if block ~= currentBlock or slotChanged then
+                        currentBlock = block
+                        updateBreakSpeed()
+                    end
+
+                    return oldHitBlock and oldHitBlock(self, maid, raycastparams, ...)
+                end
+
                 updateBlacklistCache()
-                
+                updateBreakSpeed()
+
                 task.spawn(function()
                     while FastBreak.Enabled do
                         if tick() - lastCacheClean > cacheCleanInterval then
@@ -3925,49 +3941,91 @@ run(function()
                             bedCache = {}
                             blacklistCache = {}
                         end
-                        if pendingUpdate then updateBreakSpeed() end
-                        task_wait(0.5) 
+
+                        if pendingUpdate then
+                            updateBreakSpeed()
+                        end
+
+                        task_wait(0.5)
                     end
                 end)
-			else
-				pcall(function() bedwars.BlockBreakController.blockBreaker:setCooldown(0.3) end)
-				if oldHitBlock then
-					bedwars.BlockBreaker.hitBlock = oldHitBlock
-					oldHitBlock = nil
-				end
-				currentBlock = nil
-				lastHotbarSlot = nil
-				bedCache, blacklistCache, cachedBlacklistLower = {}, {}, {}
-			end
+            else
+                pcall(function()
+                    bedwars.BlockBreakController.blockBreaker:setCooldown(0.3)
+                end)
+
+                if oldHitBlock then
+                    bedwars.BlockBreaker.hitBlock = oldHitBlock
+                    oldHitBlock = nil
+                end
+
+                currentBlock = nil
+                lastHotbarSlot = nil
+                bedCache = {}
+                blacklistCache = {}
+                cachedBlacklistLower = {}
+            end
         end,
         Tooltip = 'Decreases block hit cooldown'
     })
-    
+
     Time = FastBreak:CreateSlider({
         Name = 'Break speed',
-        Min = 0, Max = 0.3, Default = 0.25, Decimal = 100, Suffix = 'seconds',
-        Function = function() updateBreakSpeed() end
+        Min = 0,
+        Max = 0.3,
+        Default = 0.25,
+        Decimal = 100,
+        Suffix = 'seconds',
+        Function = function()
+            updateBreakSpeed()
+        end
     })
-    
+
     BedCheck = FastBreak:CreateToggle({
         Name = 'Bed Check',
         Default = false,
         Tooltip = 'Use normal break speed when breaking beds',
-        Function = function() bedCache = {}; updateBreakSpeed() end
-    })
-    
-    Blacklist = FastBreak:CreateToggle({
-        Name = 'Blacklist Blocks',
-        Default = false,
-        Tooltip = 'Use normal break speed on blacklisted blocks',
-        Function = function(v)
-            if blocks then blocks.Object.Visible = v end
-            blacklistCache = {}
-            if v then updateBlacklistCache() end
+        Function = function()
+            bedCache = {}
             updateBreakSpeed()
         end
     })
-    
+
+    Blacklist = FastBreak:CreateToggle({
+        Name = 'Blacklist Blocks',
+        Default = false,
+        Tooltip = 'Use a separate break speed on blacklisted blocks',
+        Function = function(enabled)
+            if blocks and blocks.Object then
+                blocks.Object.Visible = enabled
+            end
+
+            if BlacklistTime and BlacklistTime.Object then
+                BlacklistTime.Object.Visible = enabled
+            end
+
+            blacklistCache = {}
+
+            if enabled then
+                updateBlacklistCache()
+            end
+
+            updateBreakSpeed()
+        end
+    })
+
+    BlacklistTime = FastBreak:CreateSlider({
+        Name = 'Blacklist Break Speed',
+        Min = 0,
+        Max = 0.3,
+        Default = 0.3,
+        Decimal = 100,
+        Suffix = 'seconds',
+        Function = function()
+            updateBreakSpeed()
+        end
+    })
+
     blocks = FastBreak:CreateTextList({
         Name = 'Blacklisted Blocks',
         Placeholder = 'bed',
@@ -3978,6 +4036,18 @@ run(function()
             updateBreakSpeed()
         end
     })
+
+    task.defer(function()
+        local visible = Blacklist and Blacklist.Enabled or false
+
+        if blocks and blocks.Object then
+            blocks.Object.Visible = visible
+        end
+
+        if BlacklistTime and BlacklistTime.Object then
+            BlacklistTime.Object.Visible = visible
+        end
+    end)
 end)
 	
 local Fly
