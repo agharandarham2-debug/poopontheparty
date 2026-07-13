@@ -13350,133 +13350,184 @@ run(function()
 end)
 	
 run(function()
-    local AutoTool
-    local old, event
+	local AutoTool
+	local Blacklist
+	local blocks
+	local old, event
+	local cachedBlacklistLower = {}
 
-    local function isBlacklisted(block)
-        if not block or not SharedBlockBlacklist or not SharedBlockBlacklist.ListEnabled then
-            return false
-        end
+	local function updateBlacklistCache()
+		cachedBlacklistLower = {}
 
-        local blockName = string.lower(block.Name)
+		if not blocks or not blocks.ListEnabled then
+			return
+		end
 
-        for _, name in pairs(SharedBlockBlacklist.ListEnabled) do
-            name = string.lower(name)
+		for _, value in pairs(blocks.ListEnabled) do
+			if type(value) == 'string' and value ~= '' then
+				table.insert(cachedBlacklistLower, string.lower(value))
+			end
+		end
+	end
 
-            if string.find(blockName, name, 1, true) then
-                return true
-            end
-        end
+	local function isBlacklisted(block)
+		if not Blacklist or not Blacklist.Enabled then
+			return false
+		end
 
-        return false
-    end
+		if not block or #cachedBlacklistLower == 0 then
+			return false
+		end
 
-    local function switchHotbarItem(block)
-        if not block then
-            return false
-        end
+		local blockName = string.lower(block.Name)
 
-        -- Uses the same blacklist entered in FastBreak.
-        if isBlacklisted(block) then
-            return false
-        end
+		for _, value in ipairs(cachedBlacklistLower) do
+			if string.find(blockName, value, 1, true) then
+				return true
+			end
+		end
 
-        if block:GetAttribute('NoBreak') then
-            return false
-        end
+		return false
+	end
 
-        local team = lplr:GetAttribute('Team') or 0
+	local function switchHotbarItem(block)
+		if not block then
+			return false
+		end
 
-        if block:GetAttribute('Team' .. team .. 'NoBreak') then
-            return false
-        end
+		if isBlacklisted(block) then
+			return false
+		end
 
-        local blockMeta = bedwars.ItemMeta and bedwars.ItemMeta[block.Name]
-        local tool = blockMeta
-            and blockMeta.block
-            and store.tools[blockMeta.block.breakType]
-            or nil
+		if block:GetAttribute('NoBreak') then
+			return false
+		end
 
-        if not tool then
-            return false
-        end
+		local team = lplr:GetAttribute('Team') or 0
 
-        local slot
+		if block:GetAttribute('Team' .. team .. 'NoBreak') then
+			return false
+		end
 
-        for i, item in store.inventory.hotbar do
-            if item.item and item.item.itemType == tool.itemType then
-                slot = i - 1
-                break
-            end
-        end
+		local blockMeta = bedwars.ItemMeta and bedwars.ItemMeta[block.Name]
 
-        if slot ~= nil and hotbarSwitch(slot) then
-            if inputService:IsMouseButtonPressed(0) and event then
-                event:Fire()
-            end
+		local tool = blockMeta
+			and blockMeta.block
+			and store.tools[blockMeta.block.breakType]
+			or nil
 
-            return true
-        end
+		if not tool then
+			return false
+		end
 
-        return false
-    end
+		local slot = nil
 
-    AutoTool = vape.Categories.World:CreateModule({
-        Name = 'AutoTool',
-        Function = function(callback)
-            if callback then
-                event = Instance.new('BindableEvent')
-                AutoTool:Clean(event)
+		for i, value in store.inventory.hotbar do
+			if value.item and value.item.itemType == tool.itemType then
+				slot = i - 1
+				break
+			end
+		end
 
-                AutoTool:Clean(event.Event:Connect(function()
-                    pcall(
-                        contextActionService.CallFunction,
-                        contextActionService,
-                        'block-break',
-                        Enum.UserInputState.Begin,
-                        newproxy(true)
-                    )
-                end))
+		if slot ~= nil and hotbarSwitch(slot) then
+			if inputService:IsMouseButtonPressed(0) and event then
+				event:Fire()
+			end
 
-                old = bedwars.BlockBreaker.hitBlock
+			return true
+		end
 
-                bedwars.BlockBreaker.hitBlock = function(self, maid, raycastparams, ...)
-                    local blockInfo
+		return false
+	end
 
-                    pcall(function()
-                        blockInfo = self.clientManager
-                            :getBlockSelector()
-                            :getMouseInfo(1, {
-                                ray = raycastparams
-                            })
-                    end)
+	AutoTool = vape.Categories.World:CreateModule({
+		Name = 'AutoTool',
+		Function = function(callback)
+			if callback then
+				updateBlacklistCache()
 
-                    local block = blockInfo
-                        and blockInfo.target
-                        and blockInfo.target.blockInstance
-                        or nil
+				event = Instance.new('BindableEvent')
+				AutoTool:Clean(event)
 
-                    if switchHotbarItem(block) then
-                        return
-                    end
+				AutoTool:Clean(event.Event:Connect(function()
+					pcall(
+						contextActionService.CallFunction,
+						contextActionService,
+						'block-break',
+						Enum.UserInputState.Begin,
+						newproxy(true)
+					)
+				end))
 
-                    if old then
-                        return old(self, maid, raycastparams, ...)
-                    end
-                end
-            else
-                if old then
-                    bedwars.BlockBreaker.hitBlock = old
-                    old = nil
-                end
+				old = bedwars.BlockBreaker.hitBlock
 
-                event = nil
-            end
-        end,
-        Tooltip = 'Automatically selects the correct tool'
-    })
+				bedwars.BlockBreaker.hitBlock = function(self, maid, raycastparams, ...)
+					local blockInfo = nil
+
+					pcall(function()
+						blockInfo = self.clientManager
+							:getBlockSelector()
+							:getMouseInfo(1, {
+								ray = raycastparams
+							})
+					end)
+
+					local block = blockInfo
+						and blockInfo.target
+						and blockInfo.target.blockInstance
+						or nil
+
+					if switchHotbarItem(block) then
+						return
+					end
+
+					if old then
+						return old(self, maid, raycastparams, ...)
+					end
+				end
+			else
+				if old then
+					bedwars.BlockBreaker.hitBlock = old
+					old = nil
+				end
+
+				event = nil
+				table.clear(cachedBlacklistLower)
+			end
+		end,
+		Tooltip = 'Automatically selects the correct tool'
+	})
+
+	Blacklist = AutoTool:CreateToggle({
+		Name = 'Blacklist Blocks',
+		Default = false,
+		Tooltip = 'Do not automatically switch tools for blacklisted blocks',
+		Function = function(enabled)
+			if blocks and blocks.Object then
+				blocks.Object.Visible = enabled
+			end
+
+			if enabled then
+				updateBlacklistCache()
+			end
+		end
+	})
+
+	blocks = AutoTool:CreateTextList({
+		Name = 'Blacklisted Blocks',
+		Placeholder = 'wool',
+		Visible = false,
+		Function = function()
+			updateBlacklistCache()
+		end
+	})
+
+	task.defer(function()
+		if blocks and blocks.Object then
+			blocks.Object.Visible = Blacklist.Enabled
+		end
+	end)
 end)
-	
 run(function()
 	local ChestSteal
 	local Range
