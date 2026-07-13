@@ -8443,7 +8443,7 @@ run(function()
 		uicorner.CornerRadius = UDim.new(0, 4)
 		uicorner.Parent = image
 		Reference[v] = billboard
-	end
+	end)
 
 	local function AddedStar(v)
 		if not v or not v.Parent then return end
