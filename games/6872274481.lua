@@ -8379,10 +8379,12 @@ run(function()
             local bedPart = bed:FindFirstChildWhichIsA('BasePart')
 
             if bedPart then
-                local visible = maxDistance == 0 or (root.Position - bedPart.Position).Magnitude <= maxDistance
+                local distance = (root.Position - bedPart.Position).Magnitude
+                local visible = maxDistance == 0 or distance <= maxDistance
 
+                -- Only update if needed
                 for _, handle in folder:GetChildren() do
-                    if handle:IsA('BoxHandleAdornment') then
+                    if handle:IsA('BoxHandleAdornment') and handle.Visible ~= visible then
                         handle.Visible = visible
                     end
                 end
@@ -8411,10 +8413,9 @@ run(function()
                 handle.Size = part.Size + Vector3.new(0.01, 0.01, 0.01)
                 handle.AlwaysOnTop = true
                 handle.ZIndex = 2
-                handle.Visible = true
                 handle.Adornee = part
 
-                -- Keep original colors
+                -- Bed colors
                 handle.Color3 = part.Color
 
                 -- Transparency
@@ -8432,7 +8433,7 @@ run(function()
 
         table.clear(parts)
 
-        -- Apply current distance
+        -- Apply range immediately when spawned
         UpdateDistance()
     end
 
@@ -8441,6 +8442,7 @@ run(function()
 
         Function = function(callback)
             if callback then
+
                 BedESP:Clean(collectionService:GetInstanceAddedSignal('bed'):Connect(function(bed)
                     task.delay(0.2, Added, bed)
                 end))
@@ -8455,6 +8457,15 @@ run(function()
                 for _, bed in collectionService:GetTagged('bed') do
                     Added(bed)
                 end
+
+                -- Distance updater
+                BedESP:Clean(run(function()
+                    while BedESP.Enabled do
+                        UpdateDistance()
+                        task.wait(0.3)
+                    end
+                end))
+
             else
                 Folder:ClearAllChildren()
                 table.clear(Reference)
