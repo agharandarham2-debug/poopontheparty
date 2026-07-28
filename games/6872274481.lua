@@ -8366,7 +8366,6 @@ run(function()
     local Folder = Instance.new('Folder')
     Folder.Parent = vape.gui
 
-    local bedColor = Color3.fromRGB(255, 0, 0)
     local bedTransparency = 0.5
 
     local function Added(bed)
@@ -8393,12 +8392,13 @@ run(function()
                 handle.Visible = true
                 handle.Adornee = part
 
-                -- Custom color + transparency
-                handle.Color3 = bedColor
+                -- Keep original bed colors
+                handle.Color3 = part.Color
+
+                -- Transparency setting
                 handle.Transparency = bedTransparency
 
                 if part.Name == 'Legs' then
-                    handle.Color3 = Color3.fromRGB(167, 112, 64)
                     handle.Size = part.Size + Vector3.new(0.01, -1, 0.01)
                     handle.CFrame = CFrame.new(0, -0.4, 0)
                     handle.ZIndex = 0
@@ -8439,22 +8439,24 @@ run(function()
         Tooltip = 'Shows beds'
     })
 
-    BedESP.Color = BedESP:CreateColorSlider({
-        Name = 'Color',
-        Default = bedColor,
-        Function = function(color)
-            bedColor = color
-        end
-    })
-
     BedESP.Transparency = BedESP:CreateSlider({
         Name = 'Transparency',
         Min = 0,
         Max = 1,
-        Default = bedTransparency,
+        Default = 0.5,
         Decimal = 2,
+
         Function = function(value)
             bedTransparency = value
+
+            -- Update existing ESPs instantly
+            for _, folder in Reference do
+                for _, handle in folder:GetChildren() do
+                    if handle:IsA('BoxHandleAdornment') then
+                        handle.Transparency = value
+                    end
+                end
+            end
         end
     })
 end)
