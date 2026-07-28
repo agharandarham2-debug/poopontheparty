@@ -8498,8 +8498,8 @@ run(function()
     BedESP.Distance = BedESP:CreateSlider({
         Name = 'Distance',
         Min = 0,
-        Max = 500,
-        Default = 100,
+        Max = 100,
+        Default = 0,
         Decimal = 0,
 
         Function = function(value)
