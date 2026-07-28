@@ -8369,19 +8369,30 @@ run(function()
     local bedTransparency = 0.5
     local maxDistance = 100
 
+    local function UpdateDistance()
+        local root = lplr.Character and lplr.Character:FindFirstChild('HumanoidRootPart')
+        if not root then
+            return
+        end
+
+        for bed, folder in Reference do
+            local bedPart = bed:FindFirstChildWhichIsA('BasePart')
+
+            if bedPart then
+                local distance = (root.Position - bedPart.Position).Magnitude
+                local visible = maxDistance == 0 or distance <= maxDistance
+
+                for _, handle in folder:GetChildren() do
+                    if handle:IsA('BoxHandleAdornment') then
+                        handle.Visible = visible
+                    end
+                end
+            end
+        end
+    end
+
     local function Added(bed)
         if not BedESP.Enabled then
-            return
-        end
-
-        local root = lplr.Character and lplr.Character:FindFirstChild('HumanoidRootPart')
-        local bedPart = bed:FindFirstChildWhichIsA('BasePart')
-
-        if not root or not bedPart then
-            return
-        end
-
-        if maxDistance ~= 0 and (root.Position - bedPart.Position).Magnitude > maxDistance then
             return
         end
 
@@ -8404,7 +8415,7 @@ run(function()
                 handle.Visible = true
                 handle.Adornee = part
 
-                -- Keep original bed colors
+                -- Native colors
                 handle.Color3 = part.Color
 
                 -- Transparency
@@ -8421,15 +8432,6 @@ run(function()
         end
 
         table.clear(parts)
-    end
-
-    local function RefreshBeds()
-        Folder:ClearAllChildren()
-        table.clear(Reference)
-
-        for _, bed in collectionService:GetTagged('bed') do
-            Added(bed)
-        end
     end
 
     BedESP = vape.Categories.Render:CreateModule({
@@ -8451,6 +8453,13 @@ run(function()
                 for _, bed in collectionService:GetTagged('bed') do
                     Added(bed)
                 end
+
+                BedESP:Clean(run(function()
+                    while BedESP.Enabled do
+                        UpdateDistance()
+                        task.wait(0.2)
+                    end
+                end))
             else
                 Folder:ClearAllChildren()
                 table.clear(Reference)
@@ -8489,10 +8498,6 @@ run(function()
 
         Function = function(value)
             maxDistance = value
-
-            if BedESP.Enabled then
-                RefreshBeds()
-            end
         end
     })
 end)
