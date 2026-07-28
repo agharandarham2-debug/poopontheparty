@@ -8379,8 +8379,7 @@ run(function()
             local bedPart = bed:FindFirstChildWhichIsA('BasePart')
 
             if bedPart then
-                local distance = (root.Position - bedPart.Position).Magnitude
-                local visible = maxDistance == 0 or distance <= maxDistance
+                local visible = maxDistance == 0 or (root.Position - bedPart.Position).Magnitude <= maxDistance
 
                 for _, handle in folder:GetChildren() do
                     if handle:IsA('BoxHandleAdornment') then
@@ -8415,7 +8414,7 @@ run(function()
                 handle.Visible = true
                 handle.Adornee = part
 
-                -- Native colors
+                -- Keep original colors
                 handle.Color3 = part.Color
 
                 -- Transparency
@@ -8432,6 +8431,9 @@ run(function()
         end
 
         table.clear(parts)
+
+        -- Apply current distance
+        UpdateDistance()
     end
 
     BedESP = vape.Categories.Render:CreateModule({
@@ -8453,13 +8455,6 @@ run(function()
                 for _, bed in collectionService:GetTagged('bed') do
                     Added(bed)
                 end
-
-                BedESP:Clean(run(function()
-                    while BedESP.Enabled do
-                        UpdateDistance()
-                        task.wait(0.2)
-                    end
-                end))
             else
                 Folder:ClearAllChildren()
                 table.clear(Reference)
@@ -8498,6 +8493,7 @@ run(function()
 
         Function = function(value)
             maxDistance = value
+            UpdateDistance()
         end
     })
 end)
