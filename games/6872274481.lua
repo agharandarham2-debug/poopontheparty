@@ -8367,9 +8367,22 @@ run(function()
     Folder.Parent = vape.gui
 
     local bedTransparency = 0.5
+    local maxDistance = 100
 
     local function Added(bed)
         if not BedESP.Enabled then
+            return
+        end
+
+        -- Distance check
+        local root = lplr.Character and lplr.Character:FindFirstChild('HumanoidRootPart')
+        local bedPart = bed:FindFirstChildWhichIsA('BasePart')
+
+        if not root or not bedPart then
+            return
+        end
+
+        if maxDistance ~= 0 and (root.Position - bedPart.Position).Magnitude > maxDistance then
             return
         end
 
@@ -8395,7 +8408,7 @@ run(function()
                 -- Keep original bed colors
                 handle.Color3 = part.Color
 
-                -- Transparency setting
+                -- Transparency
                 handle.Transparency = bedTransparency
 
                 if part.Name == 'Legs' then
@@ -8449,7 +8462,7 @@ run(function()
         Function = function(value)
             bedTransparency = value
 
-            -- Update existing ESPs instantly
+            -- Update existing ESP
             for _, folder in Reference do
                 for _, handle in folder:GetChildren() do
                     if handle:IsA('BoxHandleAdornment') then
@@ -8457,6 +8470,18 @@ run(function()
                     end
                 end
             end
+        end
+    })
+
+    BedESP.Distance = BedESP:CreateSlider({
+        Name = 'Distance',
+        Min = 0,
+        Max = 500,
+        Default = 100,
+        Decimal = 0,
+
+        Function = function(value)
+            maxDistance = value
         end
     })
 end)
