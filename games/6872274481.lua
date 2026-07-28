@@ -8374,7 +8374,6 @@ run(function()
             return
         end
 
-        -- Distance check
         local root = lplr.Character and lplr.Character:FindFirstChild('HumanoidRootPart')
         local bedPart = bed:FindFirstChildWhichIsA('BasePart')
 
@@ -8424,6 +8423,15 @@ run(function()
         table.clear(parts)
     end
 
+    local function RefreshBeds()
+        Folder:ClearAllChildren()
+        table.clear(Reference)
+
+        for _, bed in collectionService:GetTagged('bed') do
+            Added(bed)
+        end
+    end
+
     BedESP = vape.Categories.Render:CreateModule({
         Name = 'Bed ESP',
 
@@ -8462,7 +8470,6 @@ run(function()
         Function = function(value)
             bedTransparency = value
 
-            -- Update existing ESP
             for _, folder in Reference do
                 for _, handle in folder:GetChildren() do
                     if handle:IsA('BoxHandleAdornment') then
@@ -8482,6 +8489,10 @@ run(function()
 
         Function = function(value)
             maxDistance = value
+
+            if BedESP.Enabled then
+                RefreshBeds()
+            end
         end
     })
 end)
