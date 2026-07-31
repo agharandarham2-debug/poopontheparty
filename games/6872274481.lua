@@ -19639,102 +19639,65 @@ run(function()
 end)
 
 run(function()
-NoCollision = vape.Categories.World:CreateModule({
-	Name = 'NoCollision',
-	Function = function(callback)
-		if callback then
-			local Knit = debug.getupvalue(require(player.PlayerScripts.TS.knit).setup, 9)
-			repeat task.wait() until debug.getupvalue(Knit.Start, 1)
+	local Knit
 
-			local BlockBreakController = Knit.Controllers.BlockBreakController
-			if not BlockBreakController then
-				warn("[NoCollision] BlockBreakController not found")
-				return
-			end
+	NoCollision = vape.Categories.World:CreateModule({
+		Name = 'NoCollision',
+		Function = function(callback)
+			if callback then
+				Knit = debug.getupvalue(require(player.PlayerScripts.TS.knit).setup, 9)
 
-			local blockSelector = BlockBreakController.blockBreaker.clientManager:getBlockSelector()
+				if not Knit then
+					warn("[NoCollision] Knit not found")
+					return
+				end
 
-			originalGetMouseInfo = blockSelector.getMouseInfo
+				repeat task.wait() until Knit.Start and debug.getupvalue(Knit.Start, 1)
 
-			blockSelector.getMouseInfo = function(...)
-				local result = originalGetMouseInfo(...)
+				local BlockBreakController = Knit.Controllers.BlockBreakController
+				if not BlockBreakController then
+					warn("[NoCollision] BlockBreakController not found")
+					return
+				end
 
-				if not result or not result.ray then
+				local blockSelector = BlockBreakController.blockBreaker.clientManager:getBlockSelector()
+
+				originalGetMouseInfo = blockSelector.getMouseInfo
+
+				blockSelector.getMouseInfo = function(...)
+					local result = originalGetMouseInfo(...)
+
+					if not result then
+						return result
+					end
+
+					-- Get original target data
+					local target = result.target
+
+					if target and target.blockInstance then
+						return result
+					end
+
 					return result
 				end
 
-				local ray = result.ray
+			else
+				if originalGetMouseInfo and Knit then
+					local BlockBreakController = Knit.Controllers.BlockBreakController
 
-				local params = RaycastParams.new()
-				params.FilterType = Enum.RaycastFilterType.Blacklist
-				params.IgnoreWater = true
+					if BlockBreakController then
+						local blockSelector = BlockBreakController.blockBreaker.clientManager:getBlockSelector()
+						blockSelector.getMouseInfo = originalGetMouseInfo
+					end
 
-				local ignored = {}
-
-				if player.Character then
-					table.insert(ignored, player.Character)
+					originalGetMouseInfo = nil
 				end
-
-				params.FilterDescendantsInstances = ignored
-
-				local direction = ray.Direction.Unit * 100
-
-				for i = 1, 50 do
-					local hit = workspace:Raycast(
-						ray.Origin,
-						direction,
-						params
-					)
-
-					if not hit then
-						return result
-					end
-
-					local blockInstance = BlockEngine:getBlockInstanceFromChild(hit.Instance)
-
-					if blockInstance then
-						result.target = {
-							blockInstance = blockInstance,
-							blockRef = {
-								blockPosition = BlockEngine:getBlockPosition(blockInstance.Position)
-							},
-							hitPosition = hit.Position,
-							hitNormal = hit.Normal
-						}
-
-						return result
-					end
-
-
-					local model = hit.Instance:FindFirstAncestorOfClass("Model")
-
-					-- Ignore players/NPCs regardless of angle
-					if model and model:FindFirstChildOfClass("Humanoid") then
-						table.insert(params.FilterDescendantsInstances, model)
-					else
-						table.insert(params.FilterDescendantsInstances, hit.Instance)
-					end
-				end
-
-				return result
 			end
+		end,
 
-		else
-			if originalGetMouseInfo then
-				local BlockBreakController = Knit.Controllers.BlockBreakController
-				if BlockBreakController then
-					local blockSelector = BlockBreakController.blockBreaker.clientManager:getBlockSelector()
-					blockSelector.getMouseInfo = originalGetMouseInfo
-				end
-
-				originalGetMouseInfo = nil
-			end
-		end
-	end,
-
-	Tooltip = 'Mine/build through players and NPCs. HUGE LAG FIX'
-})
-	end)
+		Tooltip = 'Mine/build through players and NPCs. HUGE LAG FIX'
+	})
+end)
 run(function()
 	local ShadowRemover
 	local connections = {}
