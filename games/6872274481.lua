@@ -19770,7 +19770,7 @@ run(function()
     end,
     Tooltip = 'Mine/build through players and NPCs'
 })
-																																																																																			end)
+end)
 run(function()
 	local ShadowRemover
 	local connections = {}
