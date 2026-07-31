@@ -19639,7 +19639,7 @@ run(function()
 end)
 
 run(function()
-     NoCollision = vape.Categories.World:CreateModule({
+ NoCollision = vape.Categories.World:CreateModule({
     Name = 'NoCollision',
     Function = function(callback)
         if callback then
@@ -19715,19 +19715,15 @@ run(function()
             updateAllCollisions(true)
             
             -- ===== RAYCAST INTEGRATION =====
-            -- Hook the game's raycast function to respect NoCollision
             local originalRaycast = workspace.Raycast
             workspace.Raycast = function(self, origin, direction, range, raycastParams)
                 if not NoCollision.Enabled or hasValidWeapon() then
                     return originalRaycast(self, origin, direction, range, raycastParams)
                 end
                 
-                -- NoCollision active - filter out all characters
                 local params = raycastParams or RaycastParams.new()
-                local filterType = params.FilterType or Enum.RaycastFilterType.Blacklist
                 local filterList = params.FilterDescendantsInstances or {}
                 
-                -- Add all character parts to filter
                 for _, entity in entitylib.List do
                     if entity.Character then
                         for _, part in ipairs(entity.Character:GetDescendants()) do
@@ -19738,7 +19734,7 @@ run(function()
                     end
                 end
                 
-                params.FilterType = filterType
+                params.FilterType = Enum.RaycastFilterType.Blacklist
                 params.FilterDescendantsInstances = filterList
                 
                 return originalRaycast(self, origin, direction, range, params)
@@ -19761,7 +19757,6 @@ run(function()
             lastWeaponState = nil
             weaponCheckCounter = 0
             
-            -- Restore original raycast
             if originalRaycast then
                 workspace.Raycast = originalRaycast
                 originalRaycast = nil
