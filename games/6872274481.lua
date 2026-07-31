@@ -19639,7 +19639,7 @@ run(function()
 end)
 
 run(function()
-NoCollision = vape.Categories.World:CreateModule({
+     NoCollision = vape.Categories.World:CreateModule({
     Name = 'NoCollision',
     Function = function(callback)
         if callback then
@@ -19770,7 +19770,7 @@ NoCollision = vape.Categories.World:CreateModule({
     end,
     Tooltip = 'Mine/build through players and NPCs'
 })
-
+																																																																																			end)
 run(function()
 	local ShadowRemover
 	local connections = {}
