@@ -19639,133 +19639,98 @@ run(function()
 end)
 
 run(function()
- NoCollision = vape.Categories.World:CreateModule({
-    Name = 'NoCollision',
-    Function = function(callback)
-        if callback then
-            local frameCounter = 0
-            local heartbeatConn = runService.Heartbeat:Connect(function()
-                if not NoCollision.Enabled then return end
+		local NoCollision
 
-                frameCounter = frameCounter + 1
+	local Players = game:GetService("Players")
+	local player = Players.LocalPlayer
 
-                if frameCounter % 12 == 0 then
-                    updateAllCollisions(false)
-                end
+	local BlockEngine = require(game:GetService("ReplicatedStorage").rbxts_include.node_modules["@easy-games"]["block-engine"].out).BlockEngine
+	local BlockSelectorMode = require(
+		game:GetService("ReplicatedStorage").rbxts_include.node_modules["@easy-games"]["block-engine"].out.client.select["block-selector"]
+	).BlockSelectorMode
 
-                if frameCounter % 30 == 0 then
-                    updateMotorParts()
-                end
-            end)
-            table.insert(connections, heartbeatConn)
+	local originalGetMouseInfo = nil
 
-            lastWeaponState = hasValidWeapon()
-            for _, entity in entitylib.List do
-                if entity.Character and entity.Character.Parent then
-                    if not lastWeaponState then
-                        removeCollision(entity.Character)
-                    end
-                end
-            end
+	local function hookedGetMouseInfo(self, mode, options)
+		local result = originalGetMouseInfo(self, mode, options)
 
-            local entityAddedConn = entitylib.Events.EntityAdded:Connect(function(entity)
-                if not NoCollision.Enabled then return end
-                if entity.Character then
-                    task.wait(0.05)
-                    if not hasValidWeapon() then
-                        removeCollision(entity.Character)
-                    end
-                end
-            end)
-            table.insert(connections, entityAddedConn)
+		-- If a block was found normally, just return it
+		if result and result.target then
+			return result
+		end
 
-            local entityRemovedConn = entitylib.Events.EntityRemoved:Connect(function(entity)
-                if entity.Character then
-                    trackedParts[entity.Character] = nil
-                    motorParts[entity.Character] = nil
-                end
-            end)
-            table.insert(connections, entityRemovedConn)
+		-- Normal raycast missed (likely a player was in the way) — retry ignoring all characters
+		local ray = options and options.ray
+		if not ray then
+			ray = self.mouse and self.mouse.UnitRay
+		end
+		if not ray then return result end
 
-            if vapeEvents and vapeEvents.InventoryChanged then
-                local inventoryConn = vapeEvents.InventoryChanged.Event:Connect(function()
-                    if NoCollision.Enabled then
-                        updateAllCollisions(true)
-                    end
-                end)
-                table.insert(connections, inventoryConn)
-            else
-                local lastTool = store.hand and store.hand.tool
-                local toolFrameCounter = 0
-                local monitorConn = runService.Heartbeat:Connect(function()
-                    if not NoCollision.Enabled then return end
+		local range = (options and options.range) or 10
 
-                    toolFrameCounter = toolFrameCounter + 1
-                    if toolFrameCounter % 5 == 0 then
-                        local currentTool = store.hand and store.hand.tool
-                        if currentTool ~= lastTool then
-                            lastTool = currentTool
-                            updateAllCollisions(true)
-                        end
-                    end
-                end)
-                table.insert(connections, monitorConn)
-            end
+		local params = RaycastParams.new()
+		params.FilterType = Enum.RaycastFilterType.Blacklist
+		params.IgnoreWater = true
 
-            updateAllCollisions(true)
-            
-            -- ===== RAYCAST INTEGRATION =====
-            local originalRaycast = workspace.Raycast
-            workspace.Raycast = function(self, origin, direction, range, raycastParams)
-                if not NoCollision.Enabled or hasValidWeapon() then
-                    return originalRaycast(self, origin, direction, range, raycastParams)
-                end
-                
-                local params = raycastParams or RaycastParams.new()
-                local filterList = params.FilterDescendantsInstances or {}
-                
-                for _, entity in entitylib.List do
-                    if entity.Character then
-                        for _, part in ipairs(entity.Character:GetDescendants()) do
-                            if part:IsA("BasePart") then
-                                table.insert(filterList, part)
-                            end
-                        end
-                    end
-                end
-                
-                params.FilterType = Enum.RaycastFilterType.Blacklist
-                params.FilterDescendantsInstances = filterList
-                
-                return originalRaycast(self, origin, direction, range, params)
-            end
-            
-        else
-            for _, conn in connections do
-                conn:Disconnect()
-            end
-            table.clear(connections)
+		local filterList = {}
+		for _, p in ipairs(Players:GetPlayers()) do
+			if p.Character then
+				table.insert(filterList, p.Character)
+			end
+		end
+		params.FilterDescendantsInstances = filterList
 
-            for _, entity in entitylib.List do
-                if entity.Character then
-                    restoreCollision(entity.Character)
-                end
-            end
+		local hit = workspace:Raycast(ray.Origin, ray.Direction * (range * 3.5), params)
+		if not hit then return result end
 
-            table.clear(trackedParts)
-            table.clear(motorParts)
-            lastWeaponState = nil
-            weaponCheckCounter = 0
-            
-            if originalRaycast then
-                workspace.Raycast = originalRaycast
-                originalRaycast = nil
-            end
-        end
-    end,
-    Tooltip = 'Mine/build through players and NPCs'
-})
+		local blockInstance = BlockEngine:getBlockInstanceFromChild(hit.Instance)
+		if not blockInstance then return result end
+
+		local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+		if root and (hit.Position - root.Position).Magnitude > 18 then return result end
+
+		return {
+			target = {
+				blockInstance = blockInstance,
+				blockRef      = { blockPosition = BlockEngine:getBlockPosition(blockInstance.Position) },
+				hitPosition   = hit.Position,
+				hitNormal     = hit.Normal,
+			}
+		}
+	end
+
+	NoCollision = vape.Categories.World:CreateModule({
+		Name = 'NoCollision',
+		Function = function(callback)
+			if callback then
+				local Knit = debug.getupvalue(require(player.PlayerScripts.TS.knit).setup, 9)
+				repeat task.wait() until debug.getupvalue(Knit.Start, 1)
+
+				local BlockBreakController = Knit.Controllers.BlockBreakController
+				if not BlockBreakController then
+					warn("[NoCollision] BlockBreakController not found")
+					return
+				end
+
+				local blockSelector = BlockBreakController.blockBreaker.clientManager:getBlockSelector()
+				originalGetMouseInfo = blockSelector.getMouseInfo
+				blockSelector.getMouseInfo = hookedGetMouseInfo
+			else
+				-- Restore original on disable
+				if originalGetMouseInfo then
+					local BlockBreakController = Knit.Controllers.BlockBreakController
+					if BlockBreakController then
+						local blockSelector = BlockBreakController.blockBreaker.clientManager:getBlockSelector()
+						blockSelector.getMouseInfo = originalGetMouseInfo
+					end
+					originalGetMouseInfo = nil
+				end
+			end
+		end,
+		Tooltip = 'Mine/build through players and NPCs'
+	})
 end)
+
 run(function()
 	local ShadowRemover
 	local connections = {}
