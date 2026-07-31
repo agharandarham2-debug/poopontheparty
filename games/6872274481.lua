@@ -19639,97 +19639,101 @@ run(function()
 end)
 
 run(function()
-		local NoCollision
+NoCollision = vape.Categories.World:CreateModule({
+	Name = 'NoCollision',
+	Function = function(callback)
+		if callback then
+			local Knit = debug.getupvalue(require(player.PlayerScripts.TS.knit).setup, 9)
+			repeat task.wait() until debug.getupvalue(Knit.Start, 1)
 
-	local Players = game:GetService("Players")
-	local player = Players.LocalPlayer
-
-	local BlockEngine = require(game:GetService("ReplicatedStorage").rbxts_include.node_modules["@easy-games"]["block-engine"].out).BlockEngine
-	local BlockSelectorMode = require(
-		game:GetService("ReplicatedStorage").rbxts_include.node_modules["@easy-games"]["block-engine"].out.client.select["block-selector"]
-	).BlockSelectorMode
-
-	local originalGetMouseInfo = nil
-
-	local function hookedGetMouseInfo(self, mode, options)
-		local result = originalGetMouseInfo(self, mode, options)
-
-		-- If a block was found normally, just return it
-		if result and result.target then
-			return result
-		end
-
-		-- Normal raycast missed (likely a player was in the way) — retry ignoring all characters
-		local ray = options and options.ray
-		if not ray then
-			ray = self.mouse and self.mouse.UnitRay
-		end
-		if not ray then return result end
-
-		local range = (options and options.range) or 10
-
-		local params = RaycastParams.new()
-		params.FilterType = Enum.RaycastFilterType.Blacklist
-		params.IgnoreWater = true
-
-		local filterList = {}
-		for _, p in ipairs(Players:GetPlayers()) do
-			if p.Character then
-				table.insert(filterList, p.Character)
+			local BlockBreakController = Knit.Controllers.BlockBreakController
+			if not BlockBreakController then
+				warn("[NoCollision] BlockBreakController not found")
+				return
 			end
-		end
-		params.FilterDescendantsInstances = filterList
 
-		local hit = workspace:Raycast(ray.Origin, ray.Direction * (range * 3.5), params)
-		if not hit then return result end
+			local blockSelector = BlockBreakController.blockBreaker.clientManager:getBlockSelector()
 
-		local blockInstance = BlockEngine:getBlockInstanceFromChild(hit.Instance)
-		if not blockInstance then return result end
+			originalGetMouseInfo = blockSelector.getMouseInfo
 
-		local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-		if root and (hit.Position - root.Position).Magnitude > 18 then return result end
+			blockSelector.getMouseInfo = function(...)
+				local result = originalGetMouseInfo(...)
 
-		return {
-			target = {
-				blockInstance = blockInstance,
-				blockRef      = { blockPosition = BlockEngine:getBlockPosition(blockInstance.Position) },
-				hitPosition   = hit.Position,
-				hitNormal     = hit.Normal,
-			}
-		}
-	end
-
-	NoCollision = vape.Categories.World:CreateModule({
-		Name = 'NoCollision',
-		Function = function(callback)
-			if callback then
-				local Knit = debug.getupvalue(require(player.PlayerScripts.TS.knit).setup, 9)
-				repeat task.wait() until debug.getupvalue(Knit.Start, 1)
-
-				local BlockBreakController = Knit.Controllers.BlockBreakController
-				if not BlockBreakController then
-					warn("[NoCollision] BlockBreakController not found")
-					return
+				if not result or not result.ray then
+					return result
 				end
 
-				local blockSelector = BlockBreakController.blockBreaker.clientManager:getBlockSelector()
-				originalGetMouseInfo = blockSelector.getMouseInfo
-				blockSelector.getMouseInfo = hookedGetMouseInfo
-			else
-				-- Restore original on disable
-				if originalGetMouseInfo then
-					local BlockBreakController = Knit.Controllers.BlockBreakController
-					if BlockBreakController then
-						local blockSelector = BlockBreakController.blockBreaker.clientManager:getBlockSelector()
-						blockSelector.getMouseInfo = originalGetMouseInfo
+				local ray = result.ray
+
+				local params = RaycastParams.new()
+				params.FilterType = Enum.RaycastFilterType.Blacklist
+				params.IgnoreWater = true
+
+				local ignored = {}
+
+				if player.Character then
+					table.insert(ignored, player.Character)
+				end
+
+				params.FilterDescendantsInstances = ignored
+
+				local direction = ray.Direction.Unit * 100
+
+				for i = 1, 50 do
+					local hit = workspace:Raycast(
+						ray.Origin,
+						direction,
+						params
+					)
+
+					if not hit then
+						return result
 					end
-					originalGetMouseInfo = nil
+
+					local blockInstance = BlockEngine:getBlockInstanceFromChild(hit.Instance)
+
+					if blockInstance then
+						result.target = {
+							blockInstance = blockInstance,
+							blockRef = {
+								blockPosition = BlockEngine:getBlockPosition(blockInstance.Position)
+							},
+							hitPosition = hit.Position,
+							hitNormal = hit.Normal
+						}
+
+						return result
+					end
+
+
+					local model = hit.Instance:FindFirstAncestorOfClass("Model")
+
+					-- Ignore players/NPCs regardless of angle
+					if model and model:FindFirstChildOfClass("Humanoid") then
+						table.insert(params.FilterDescendantsInstances, model)
+					else
+						table.insert(params.FilterDescendantsInstances, hit.Instance)
+					end
 				end
+
+				return result
 			end
-		end,
-		Tooltip = 'Mine/build through players and NPCs'
-	})
-end)
+
+		else
+			if originalGetMouseInfo then
+				local BlockBreakController = Knit.Controllers.BlockBreakController
+				if BlockBreakController then
+					local blockSelector = BlockBreakController.blockBreaker.clientManager:getBlockSelector()
+					blockSelector.getMouseInfo = originalGetMouseInfo
+				end
+
+				originalGetMouseInfo = nil
+			end
+		end
+	end,
+
+	Tooltip = 'Mine/build through players and NPCs. HUGE LAG FIX'
+})
 
 run(function()
 	local ShadowRemover
