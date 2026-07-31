@@ -19734,7 +19734,7 @@ NoCollision = vape.Categories.World:CreateModule({
 
 	Tooltip = 'Mine/build through players and NPCs. HUGE LAG FIX'
 })
-
+	end)
 run(function()
 	local ShadowRemover
 	local connections = {}
@@ -34479,7 +34479,7 @@ run(function()
                         task.wait(0.05)
                     end
                 end)
-
+	
                 timeoutMonitor = task.spawn(function()
                     while AutoFarm.Enabled do
                         if gameStartTime then
