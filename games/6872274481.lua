@@ -19639,20 +19639,12 @@ run(function()
 end)
 
 run(function()
-	local Knit
-
 	NoCollision = vape.Categories.World:CreateModule({
 		Name = 'NoCollision',
 		Function = function(callback)
 			if callback then
-				Knit = debug.getupvalue(require(player.PlayerScripts.TS.knit).setup, 9)
-
-				if not Knit then
-					warn("[NoCollision] Knit not found")
-					return
-				end
-
-				repeat task.wait() until Knit.Start and debug.getupvalue(Knit.Start, 1)
+				local Knit = debug.getupvalue(require(player.PlayerScripts.TS.knit).setup, 9)
+				repeat task.wait() until debug.getupvalue(Knit.Start, 1)
 
 				local BlockBreakController = Knit.Controllers.BlockBreakController
 				if not BlockBreakController then
@@ -19661,40 +19653,20 @@ run(function()
 				end
 
 				local blockSelector = BlockBreakController.blockBreaker.clientManager:getBlockSelector()
-
 				originalGetMouseInfo = blockSelector.getMouseInfo
-
-				blockSelector.getMouseInfo = function(...)
-					local result = originalGetMouseInfo(...)
-
-					if not result then
-						return result
-					end
-
-					-- Get original target data
-					local target = result.target
-
-					if target and target.blockInstance then
-						return result
-					end
-
-					return result
-				end
-
+				blockSelector.getMouseInfo = hookedGetMouseInfo
 			else
-				if originalGetMouseInfo and Knit then
+				-- Restore original on disable
+				if originalGetMouseInfo then
 					local BlockBreakController = Knit.Controllers.BlockBreakController
-
 					if BlockBreakController then
 						local blockSelector = BlockBreakController.blockBreaker.clientManager:getBlockSelector()
 						blockSelector.getMouseInfo = originalGetMouseInfo
 					end
-
 					originalGetMouseInfo = nil
 				end
 			end
 		end,
-
 		Tooltip = 'Mine/build through players and NPCs. HUGE LAG FIX'
 	})
 end)
