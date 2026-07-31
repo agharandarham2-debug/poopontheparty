@@ -19639,6 +19639,66 @@ run(function()
 end)
 
 run(function()
+		local NoCollision
+
+	local Players = game:GetService("Players")
+	local player = Players.LocalPlayer
+
+	local BlockEngine = require(game:GetService("ReplicatedStorage").rbxts_include.node_modules["@easy-games"]["block-engine"].out).BlockEngine
+	local BlockSelectorMode = require(
+		game:GetService("ReplicatedStorage").rbxts_include.node_modules["@easy-games"]["block-engine"].out.client.select["block-selector"]
+	).BlockSelectorMode
+
+	local originalGetMouseInfo = nil
+
+	local function hookedGetMouseInfo(self, mode, options)
+		local result = originalGetMouseInfo(self, mode, options)
+
+		-- If a block was found normally, just return it
+		if result and result.target then
+			return result
+		end
+
+		-- Normal raycast missed (likely a player was in the way) — retry ignoring all characters
+		local ray = options and options.ray
+		if not ray then
+			ray = self.mouse and self.mouse.UnitRay
+		end
+		if not ray then return result end
+
+		local range = (options and options.range) or 10
+
+		local params = RaycastParams.new()
+		params.FilterType = Enum.RaycastFilterType.Blacklist
+		params.IgnoreWater = true
+
+		local filterList = {}
+		for _, p in ipairs(Players:GetPlayers()) do
+			if p.Character then
+				table.insert(filterList, p.Character)
+			end
+		end
+		params.FilterDescendantsInstances = filterList
+
+		local hit = workspace:Raycast(ray.Origin, ray.Direction * (range * 3.5), params)
+		if not hit then return result end
+
+		local blockInstance = BlockEngine:getBlockInstanceFromChild(hit.Instance)
+		if not blockInstance then return result end
+
+		local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+		if root and (hit.Position - root.Position).Magnitude > 18 then return result end
+
+		return {
+			target = {
+				blockInstance = blockInstance,
+				blockRef      = { blockPosition = BlockEngine:getBlockPosition(blockInstance.Position) },
+				hitPosition   = hit.Position,
+				hitNormal     = hit.Normal,
+			}
+		}
+	end
+
 	NoCollision = vape.Categories.World:CreateModule({
 		Name = 'NoCollision',
 		Function = function(callback)
@@ -19667,9 +19727,10 @@ run(function()
 				end
 			end
 		end,
-		Tooltip = 'Mine/build through players and NPCs. HUGE LAG FIX'
+		Tooltip = 'Mine/build through players and NPCs'
 	})
 end)
+
 run(function()
 	local ShadowRemover
 	local connections = {}
@@ -34414,7 +34475,7 @@ run(function()
                         task.wait(0.05)
                     end
                 end)
-	
+
                 timeoutMonitor = task.spawn(function()
                     while AutoFarm.Enabled do
                         if gameStartTime then
