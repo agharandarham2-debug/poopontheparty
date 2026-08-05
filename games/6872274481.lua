@@ -34544,5 +34544,5 @@ run(function()
         Tooltip = "Allows you to mine through opponents"
     })
 end																																				
-
+																																					end)
 -- Privacy patch: removed remote poopparty module loader for KrystalDisabler.
