@@ -34496,5 +34496,53 @@ run(function()
         end
     })
 end)
+run(function()
+	local phaseMine
+    local ignoredParts = {}
+
+    local function ignoreCharacter(character)
+        for _, part in character:QueryDescendants("BasePart") do
+            table.insert(ignoredParts, part)
+            bedwars.QueryUtil:setQueryIgnored(part, false)
+        end
+
+        phaseMine:Clean(character.ChildAdded:Connect(function(child)
+            if child:IsA("BasePart") then
+                table.insert(ignoredParts, child)
+                bedwars.QueryUtil:setQueryIgnored(child, false)
+            end
+        end))
+    end
+
+    local minigames = vape.Categories.Minigames
+
+    phaseMine = minigames:CreateModule({
+        Name = "PhaseMine",
+        Function = function(enabled)
+            if not enabled then
+                for _, part in ignoredParts do
+                    if part and part.Parent then
+                        bedwars.QueryUtil:setQueryIgnored(part, false)
+                    end
+                end
+
+                table.clear(ignoredParts)
+            else
+                phaseMine:Clean(entity.Events.EntityAdded:Connect(function(newEntity)
+                    if newEntity.Player then
+                        task.delay(1, ignoreCharacter, newEntity.Character)
+                    end
+                end))
+
+                for _, listedEntity in entity.List do
+                    if listedEntity.Character then
+                        ignoreCharacter(listedEntity.Character)
+                    end
+                end
+            end
+        end,
+        Tooltip = "Allows you to mine through opponents"
+    })
+end																																				
 
 -- Privacy patch: removed remote poopparty module loader for KrystalDisabler.
