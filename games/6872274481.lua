@@ -34497,52 +34497,48 @@ run(function()
     })
 end)
 run(function()
-	local phaseMine
-    local ignoredParts = {}
+    local PhaseMine
+    local IgnoredParts = {}
 
     local function ignoreCharacter(character)
         for _, part in character:QueryDescendants("BasePart") do
-            table.insert(ignoredParts, part)
+            table.insert(IgnoredParts, part)
             bedwars.QueryUtil:setQueryIgnored(part, false)
         end
 
-        phaseMine:Clean(character.ChildAdded:Connect(function(child)
+        PhaseMine:Clean(character.ChildAdded:Connect(function(child)
             if child:IsA("BasePart") then
-                table.insert(ignoredParts, child)
+                table.insert(IgnoredParts, child)
                 bedwars.QueryUtil:setQueryIgnored(child, false)
             end
         end))
     end
 
-    local minigames = vape.Categories.Minigames
-
-    phaseMine = minigames:CreateModule({
+    PhaseMine = vape.Categories.Minigames:CreateModule({
         Name = "PhaseMine",
-        Function = function(enabled)
-            if not enabled then
-                for _, part in ignoredParts do
+        Function = function(callback)
+            if callback then
+                PhaseMine:Clean(entity.Events.EntityAdded:Connect(function(ent)
+                    if ent.Player and ent.Character then
+                        task.delay(1, ignoreCharacter, ent.Character)
+                    end
+                end))
+
+                for _, ent in entity.List do
+                    if ent.Character then
+                        ignoreCharacter(ent.Character)
+                    end
+                end
+            else
+                for _, part in IgnoredParts do
                     if part and part.Parent then
                         bedwars.QueryUtil:setQueryIgnored(part, false)
                     end
                 end
 
-                table.clear(ignoredParts)
-            else
-                phaseMine:Clean(entity.Events.EntityAdded:Connect(function(newEntity)
-                    if newEntity.Player then
-                        task.delay(1, ignoreCharacter, newEntity.Character)
-                    end
-                end))
-
-                for _, listedEntity in entity.List do
-                    if listedEntity.Character then
-                        ignoreCharacter(listedEntity.Character)
-                    end
-                end
+                table.clear(IgnoredParts)
             end
         end,
-        Tooltip = "Allows you to mine through opponents"
+        Tooltip = "Allows you to mine through opponents",
     })
-end																																				
-																																					end)
--- Privacy patch: removed remote poopparty module loader for KrystalDisabler.
+end)
