@@ -34501,15 +34501,19 @@ run(function()
     local IgnoredParts = {}
 
     local function ignoreCharacter(character)
-        for _, part in character:QueryDescendants("BasePart") do
-            table.insert(IgnoredParts, part)
-            bedwars.QueryUtil:setQueryIgnored(part, false)
+        if not character then return end
+
+        for _, part in ipairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                table.insert(IgnoredParts, part)
+                bedwars.QueryUtil:setQueryIgnored(part, true)
+            end
         end
 
-        PhaseMine:Clean(character.ChildAdded:Connect(function(child)
-            if child:IsA("BasePart") then
-                table.insert(IgnoredParts, child)
-                bedwars.QueryUtil:setQueryIgnored(child, false)
+        PhaseMine:Clean(character.DescendantAdded:Connect(function(obj)
+            if obj:IsA("BasePart") then
+                table.insert(IgnoredParts, obj)
+                bedwars.QueryUtil:setQueryIgnored(obj, true)
             end
         end))
     end
@@ -34518,19 +34522,19 @@ run(function()
         Name = "PhaseMine",
         Function = function(callback)
             if callback then
-                PhaseMine:Clean(entity.Events.EntityAdded:Connect(function(ent)
+                for _, ent in ipairs(entitylib.List) do
                     if ent.Player and ent.Character then
-                        task.delay(1, ignoreCharacter, ent.Character)
-                    end
-                end))
-
-                for _, ent in entity.List do
-                    if ent.Character then
                         ignoreCharacter(ent.Character)
                     end
                 end
+
+                PhaseMine:Clean(entitylib.Events.EntityAdded:Connect(function(ent)
+                    if ent.Player and ent.Character then
+                        ignoreCharacter(ent.Character)
+                    end
+                end))
             else
-                for _, part in IgnoredParts do
+                for _, part in ipairs(IgnoredParts) do
                     if part and part.Parent then
                         bedwars.QueryUtil:setQueryIgnored(part, false)
                     end
